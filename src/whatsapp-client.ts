@@ -121,7 +121,13 @@ export class WhatsAppClient {
         console.log(
           "QR Code received. Please scan with your WhatsApp mobile app."
         );
+        // Generate terminal QR code
         qrcode.generate(qr, { small: true });
+        // Also provide a URL to view the QR code in a browser (useful for Railway logs)
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+        console.log("\n📱 Can't see the QR code? Open this URL in your browser:");
+        console.log(qrUrl);
+        console.log("");
       }
 
       if (connection === "close") {
