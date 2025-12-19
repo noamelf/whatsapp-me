@@ -1,5 +1,5 @@
-import OpenAI from 'openai';
-import dotenv from 'dotenv';
+import OpenAI from "openai";
+import dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config();
@@ -25,16 +25,18 @@ export class OpenAIService {
   constructor() {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      throw new Error('OPENAI_API_KEY is not defined in .env file');
+      throw new Error("OPENAI_API_KEY is not defined in .env file");
     }
-    
+
     this.openai = new OpenAI({
-      apiKey: apiKey
+      apiKey: apiKey,
     });
 
     // Get allowed chat names from environment variable
     const allowedChatNamesStr = process.env.ALLOWED_CHAT_NAMES;
-    this.allowedChatNames = allowedChatNamesStr ? allowedChatNamesStr.split(',').map(name => name.trim()) : [];
+    this.allowedChatNames = allowedChatNamesStr
+      ? allowedChatNamesStr.split(",").map((name) => name.trim())
+      : [];
   }
 
   /**
@@ -44,7 +46,7 @@ export class OpenAIService {
     if (this.allowedChatNames.length === 0) {
       return true; // If no names specified, allow all chats
     }
-    return this.allowedChatNames.some(name => chatName.includes(name));
+    return this.allowedChatNames.some((name) => chatName.includes(name));
   }
 
   /**
@@ -54,10 +56,10 @@ export class OpenAIService {
     if (!this.messageHistory.has(chatId)) {
       this.messageHistory.set(chatId, []);
     }
-    
+
     const history = this.messageHistory.get(chatId)!;
     history.push(message);
-    
+
     // Keep only the last MAX_HISTORY_LENGTH messages
     if (history.length > this.MAX_HISTORY_LENGTH) {
       this.messageHistory.set(chatId, history.slice(-this.MAX_HISTORY_LENGTH));
@@ -74,11 +76,18 @@ export class OpenAIService {
   /**
    * Analyze a message to detect if it contains an event
    */
-  public async analyzeMessage(chatId: string, message: string, chatName: string, sender?: string): Promise<EventDetails> {
+  public async analyzeMessage(
+    chatId: string,
+    message: string,
+    chatName: string,
+    sender?: string
+  ): Promise<EventDetails> {
     try {
       // Check if the chat is allowed
       if (!this.isChatAllowed(chatName || chatId)) {
-        console.log(`Skipping analysis for chat ID: "${chatId}" - chat name: "${chatName}" - not in allowed list`);
+        console.log(
+          `Skipping analysis for chat ID: "${chatId}" - chat name: "${chatName}" - not in allowed list`
+        );
         console.log(`Allowed list:`, JSON.stringify(this.allowedChatNames));
         return {
           isEvent: false,
@@ -89,13 +98,13 @@ export class OpenAIService {
           location: null,
           description: null,
           startDateISO: null,
-          endDateISO: null
+          endDateISO: null,
         };
       }
 
       // Get the message history for context
       const history = this.getMessageHistory(chatId);
-      
+
       // Create the prompt for OpenAI
       const prompt = `
 Analyze the following WhatsApp message and determine if it contains information about an event (like a meeting, party, gathering, etc.).
@@ -113,37 +122,45 @@ If it is an event, extract the following details:
 7. End Date ISO - Assume the event lasts 1 hour and provide the end time in ISO format
 
 Previous messages for context:
-${history.map((msg, i) => `[${i + 1}] ${msg}`).join('\n')}
+${history.map((msg, i) => `[${i + 1}] ${msg}`).join("\n")}
 
 Current message:
 ${message}
 
-Sender: ${sender || 'Unknown'}
+Sender: ${sender || "Unknown"}
 
 Respond in the following JSON format:
 {
   "isEvent": true/false,
-  "summary": "A concise summary of the event including date, time, location, and purpose. Include the original message text.",
-  "title": "Event title in Hebrew if possible",
-  "date": "Event date",
-  "time": "Event time",
-  "location": "Event location in Hebrew if possible",
-  "description": "Event description including the original message and sender information",
+  "summary": "A brief Hebrew summary of the event (1-2 sentences)",
+  "title": "Short event title in Hebrew",
+  "date": "Event date in Hebrew (e.g., היום, מחר, יום שני)",
+  "time": "Event time (e.g., 12:00)",
+  "location": "Event location in Hebrew if mentioned, otherwise null",
+  "description": "Brief description of the event in Hebrew (do NOT include the original message)",
   "startDateISO": "YYYY-MM-DDTHH:MM:SS.sssZ",
   "endDateISO": "YYYY-MM-DDTHH:MM:SS.sssZ"
 }
 
 If it's not an event, just set isEvent to false and leave the other fields as null.
-For the summary, title, and location fields, prefer Hebrew if the content is in Hebrew or relates to Hebrew speakers.
-Make sure to include the original message in the summary.
-In the description, include both the original message and the sender information.
+For all text fields, use Hebrew.
+Keep the description brief and clean - do not repeat the original message text.
 
 For the startDateISO and endDateISO fields:
-1. Analyze the date and time from the message relative to the current date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+1. Analyze the date and time from the message relative to the current date: ${new Date().toLocaleDateString(
+        "en-US",
+        { year: "numeric", month: "long", day: "numeric" }
+      )}
 2. Assume any date and time mentioned is in Israel timezone
 3. If the time is not specified, set the time to 8:00 AM (08:00) and end time to 9:00 AM (09:00)
-4. If there is no year mentioned, assume the current year (${new Date().toLocaleDateString('en-US', { year: 'numeric' })})
-5. If there is no month mentioned, assume the current year (${new Date().toLocaleDateString('en-US', { month: 'long' })})
+4. If there is no year mentioned, assume the current year (${new Date().toLocaleDateString(
+        "en-US",
+        { year: "numeric" }
+      )})
+5. If there is no month mentioned, assume the current year (${new Date().toLocaleDateString(
+        "en-US",
+        { month: "long" }
+      )})
 6. If a time is specified, set the end time to 1 hour after the start time
 7. If you can't determine a date, use the current date
 8. Convert to ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)
@@ -151,31 +168,28 @@ For the startDateISO and endDateISO fields:
 
       // Call OpenAI API
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: "gpt-4o",
         messages: [
-          { role: 'system', content: 'You are a helpful assistant that analyzes WhatsApp messages to detect events and extract structured details. For Hebrew content, provide Hebrew output for summary, title, and location. You are also skilled at converting dates and times to ISO format.' },
-          { role: 'user', content: prompt }
+          {
+            role: "system",
+            content:
+              "You are a helpful assistant that analyzes WhatsApp messages to detect events and extract structured details. For Hebrew content, provide Hebrew output for summary, title, and location. You are also skilled at converting dates and times to ISO format.",
+          },
+          { role: "user", content: prompt },
         ],
         temperature: 0.3,
         max_tokens: 500,
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
       });
 
-      const content = response.choices[0]?.message?.content || '';
-      
+      const content = response.choices[0]?.message?.content || "";
+
       try {
         // Parse the JSON response
         const parsedResponse = JSON.parse(content);
-        
-        // Prepare description with original message and sender if not already included
-        let description = parsedResponse.description || null;
-        if (parsedResponse.isEvent === true && description) {
-          if (!description.includes(message)) {
-            const senderInfo = sender ? `Sender: ${sender}` : '';
-            description = `${description}\n\nOriginal message: ${message}${senderInfo ? '\n' + senderInfo : ''}`;
-          }
-        }
-        
+
+        const description = parsedResponse.description || null;
+
         return {
           isEvent: parsedResponse.isEvent === true,
           summary: parsedResponse.summary || null,
@@ -185,16 +199,18 @@ For the startDateISO and endDateISO fields:
           location: parsedResponse.location || null,
           description: description,
           startDateISO: parsedResponse.startDateISO || null,
-          endDateISO: parsedResponse.endDateISO || null
+          endDateISO: parsedResponse.endDateISO || null,
         };
       } catch (parseError) {
-        console.error('Error parsing OpenAI response:', parseError);
-        console.log('Raw response:', content);
-        
+        console.error("Error parsing OpenAI response:", parseError);
+        console.log("Raw response:", content);
+
         // Fallback to basic parsing if JSON parsing fails
-        const isEvent = content.includes('"isEvent": true') || content.includes('"isEvent":true');
+        const isEvent =
+          content.includes('"isEvent": true') ||
+          content.includes('"isEvent":true');
         const summaryMatch = content.match(/"summary":\s*"([^"]*)"/);
-        
+
         return {
           isEvent,
           summary: summaryMatch ? summaryMatch[1] : null,
@@ -204,11 +220,11 @@ For the startDateISO and endDateISO fields:
           location: null,
           description: null,
           startDateISO: null,
-          endDateISO: null
+          endDateISO: null,
         };
       }
     } catch (error) {
-      console.error('Error analyzing message with OpenAI:', error);
+      console.error("Error analyzing message with OpenAI:", error);
       return {
         isEvent: false,
         summary: null,
@@ -218,8 +234,8 @@ For the startDateISO and endDateISO fields:
         location: null,
         description: null,
         startDateISO: null,
-        endDateISO: null
+        endDateISO: null,
       };
     }
   }
-} 
+}
