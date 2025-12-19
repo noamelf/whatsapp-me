@@ -2,8 +2,6 @@
 builder = "dockerfile"
 
 [deploy]
-healthcheckPath = "/"
-healthcheckTimeout = 300
 restartPolicyType = "always"
 
 [[mounts]]
