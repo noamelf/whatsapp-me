@@ -213,7 +213,7 @@ For the startDateISO and endDateISO fields:
           { role: "user", content: userContent },
         ],
         temperature: 0.3,
-        max_tokens: 1500,
+        max_completion_tokens: 1500,
         response_format: { type: "json_object" },
       });
 
