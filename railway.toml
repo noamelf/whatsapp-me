@@ -3,6 +3,8 @@ builder = "dockerfile"
 
 [deploy]
 restartPolicyType = "always"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
 
 [[mounts]]
 source = "baileys_auth"

@@ -1,4 +1,5 @@
 import { WhatsAppClient } from "./whatsapp-client";
+import { HealthServer } from "./health-server";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -46,6 +47,14 @@ async function main() {
 
       // Start listening for incoming messages
       whatsappClient.startListeningForMessages();
+
+      // Start health check server
+      const healthPort = parseInt(process.env.PORT || "3000", 10);
+      const healthServer = new HealthServer(() => ({
+        isConnected: whatsappClient.isConnected(),
+        connectionState: whatsappClient.getConnectionState(),
+      }));
+      healthServer.start(healthPort);
 
       // Keep the application running until user terminates it
       await new Promise(() => {}); // This promise never resolves, keeping the app running

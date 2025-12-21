@@ -28,7 +28,7 @@ export class WhatsAppClient {
   private isReady: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 3;
-  private readonly sessionDir = ".baileys_auth";
+  private readonly sessionDir = process.env.BAILEYS_AUTH_DIR || ".baileys_auth";
   private openaiService: OpenAIService;
   private targetGroupName: string = "אני"; // Default target group name (can be overridden via TARGET_GROUP_NAME env var)
   private targetGroupId: string | null = null;
