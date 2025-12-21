@@ -7,6 +7,7 @@ import makeWASocket, {
   jidNormalizedUser,
   WAMessage,
   Browsers,
+  downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 import pino from "pino";
 import { Boom } from "@hapi/boom";
@@ -298,20 +299,50 @@ export class WhatsAppClient {
       if (
         !messageType ||
         (messageType !== "conversation" &&
-          messageType !== "extendedTextMessage")
+          messageType !== "extendedTextMessage" &&
+          messageType !== "imageMessage")
       ) {
-        return; // Only process text messages for now
+        return; // Only process text and image messages
       }
 
-      // Extract message text
+      // Extract message text and/or image
       let messageText = "";
+      let imageBase64: string | null = null;
+      let imageMimeType: string | null = null;
+
       if (messageType === "conversation") {
         messageText = message.message.conversation || "";
       } else if (messageType === "extendedTextMessage") {
         messageText = message.message.extendedTextMessage?.text || "";
+      } else if (messageType === "imageMessage") {
+        // Get caption if present
+        messageText = message.message.imageMessage?.caption || "";
+        imageMimeType = message.message.imageMessage?.mimetype || "image/jpeg";
+
+        // Download the image
+        try {
+          const buffer = await downloadMediaMessage(
+            message,
+            "buffer",
+            {},
+            {
+              logger: console as any,
+              reuploadRequest: this.socket!.updateMediaMessage,
+            }
+          );
+          if (buffer) {
+            imageBase64 = (buffer as Buffer).toString("base64");
+            console.log(
+              `Downloaded image (${(buffer as Buffer).length} bytes)`
+            );
+          }
+        } catch (error) {
+          console.error("Error downloading image:", error);
+        }
       }
 
-      if (!messageText.trim()) return;
+      // Skip if no text and no image
+      if (!messageText.trim() && !imageBase64) return;
 
       // Skip messages that are event summaries to avoid loops
       if (
@@ -363,13 +394,17 @@ export class WhatsAppClient {
       this.openaiService.addMessageToHistory(chatId, messageText);
 
       // Analyze the message for events
-      console.log(`Analyzing message for events...`);
+      console.log(
+        `Analyzing message for events...${imageBase64 ? " (with image)" : ""}`
+      );
 
       const analysis = await this.openaiService.analyzeMessage(
         chatId,
         messageText,
         chatName,
-        contactName
+        contactName,
+        imageBase64,
+        imageMimeType
       );
 
       if (analysis.hasEvents && analysis.events.length > 0) {

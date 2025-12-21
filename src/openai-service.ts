@@ -85,7 +85,9 @@ export class OpenAIService {
     chatId: string,
     message: string,
     chatName: string,
-    sender?: string
+    sender?: string,
+    imageBase64?: string | null,
+    imageMimeType?: string | null
   ): Promise<MultiEventResult> {
     try {
       // Check if the chat is allowed
@@ -104,8 +106,12 @@ export class OpenAIService {
       const history = this.getMessageHistory(chatId);
 
       // Create the prompt for OpenAI
+      const imageNote = imageBase64
+        ? "\nNote: An image is attached to this message. Please analyze both the text (if any) and the image content to detect events. The image may contain an event flyer, invitation, poster, or other visual information about an event."
+        : "";
+
       const prompt = `
-Analyze the following WhatsApp message and determine if it contains information about one or more events (like meetings, parties, gatherings, etc.).
+Analyze the following WhatsApp message and determine if it contains information about one or more events (like meetings, parties, gatherings, etc.).${imageNote}
 A message can contain MULTIPLE events - make sure to extract ALL of them.
 Events usually contain a day reference, like "יום ראשון" or "יום שני" or "יום שלישי" or "יום רביעי" or "יום חמישי" or "יום שישי" or "יום שבת" 
 It could also be a specific date. It doesn't have to include all information like location.
@@ -171,16 +177,40 @@ For the startDateISO and endDateISO fields:
 8. Convert to ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)
 `;
 
+      // Build the message content array for the API call
+      const userContent: Array<
+        | { type: "text"; text: string }
+        | {
+            type: "image_url";
+            image_url: { url: string; detail?: "low" | "high" | "auto" };
+          }
+      > = [{ type: "text", text: prompt }];
+
+      // Add image if present
+      if (imageBase64 && imageMimeType) {
+        const mimeType = imageMimeType.startsWith("image/")
+          ? imageMimeType
+          : "image/jpeg";
+        userContent.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${mimeType};base64,${imageBase64}`,
+            detail: "auto",
+          },
+        });
+        console.log("Including image in OpenAI analysis request");
+      }
+
       // Call OpenAI API
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
             content:
-              "You are a helpful assistant that analyzes WhatsApp messages to detect events and extract structured details. A single message can contain MULTIPLE events - make sure to extract ALL of them. For Hebrew content, provide Hebrew output for summary, title, and location. You are also skilled at converting dates and times to ISO format.",
+              "You are a helpful assistant that analyzes WhatsApp messages to detect events and extract structured details. A single message can contain MULTIPLE events - make sure to extract ALL of them. For Hebrew content, provide Hebrew output for summary, title, and location. You are also skilled at converting dates and times to ISO format. When an image is provided, analyze both the text and the image content to detect events (such as event flyers, invitations, posters, etc.).",
           },
-          { role: "user", content: prompt },
+          { role: "user", content: userContent },
         ],
         temperature: 0.3,
         max_tokens: 1500,
