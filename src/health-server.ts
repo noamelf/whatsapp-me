@@ -25,9 +25,9 @@ export class HealthServer {
       // Only respond to GET /health or GET /
       if (req.method === "GET" && (req.url === "/health" || req.url === "/")) {
         const status = this.getHealthStatus();
-        const statusCode = status.status === "healthy" ? 200 : 503;
-
-        res.writeHead(statusCode, { "Content-Type": "application/json" });
+        // Always return 200 so Railway doesn't kill the process during QR code scanning
+        // The status field indicates the actual WhatsApp connection state
+        res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(status, null, 2));
       } else {
         res.writeHead(404, { "Content-Type": "application/json" });

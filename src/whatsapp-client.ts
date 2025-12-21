@@ -614,21 +614,22 @@ export class WhatsAppClient {
       await this.createSocket();
 
       // Wait for connection to be established
+      // Allow 5 minutes for QR code scanning on first setup
       let attempts = 0;
-      const maxAttempts = 60; // 60 seconds timeout
+      const maxAttempts = 300; // 5 minutes timeout for QR code scanning
 
       while (!this.isReady && attempts < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         attempts++;
 
-        if (attempts % 10 === 0) {
-          console.log(`Waiting for WhatsApp connection... (${attempts}s)`);
+        if (attempts % 30 === 0) {
+          console.log(`Waiting for WhatsApp connection... (${attempts}s) - Please scan the QR code above`);
         }
       }
 
       if (!this.isReady) {
         throw new Error(
-          "Failed to establish WhatsApp connection within timeout period"
+          "Failed to establish WhatsApp connection within timeout period. Please restart and scan the QR code."
         );
       }
 
