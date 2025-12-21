@@ -279,8 +279,20 @@ export class WhatsAppClient {
 
   private async handleIncomingMessage(message: WAMessage): Promise<void> {
     try {
-      // Skip if message is from self or has no content
-      if (message.key.fromMe || !message.message) return;
+      // Skip if message has no content
+      if (!message.message) return;
+
+      const chatId = message.key.remoteJid!;
+      const isGroup = isJidGroup(chatId);
+
+      // Only process messages from:
+      // 1. Groups/communities
+      // 2. Self-chat (messages to yourself for testing)
+      const isSelfChat = message.key.fromMe && !isGroup;
+      if (!isGroup && !isSelfChat) return;
+
+      // In groups, skip our own messages to avoid loops
+      if (isGroup && message.key.fromMe) return;
 
       const messageType = getContentType(message.message);
       if (
@@ -309,9 +321,6 @@ export class WhatsAppClient {
       ) {
         return;
       }
-
-      const chatId = message.key.remoteJid!;
-      const isGroup = isJidGroup(chatId);
 
       // Process both group and private chats for event detection
 
