@@ -11,7 +11,14 @@
     "dev": "tsx watch src/index.ts",
     "test:message": "tsx src/test-message.ts",
     "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint:fix": "eslint src/ --fix",
+    "checkly:test": "checkly test",
+    "checkly:deploy": "checkly deploy",
+    "checkly:whoami": "checkly whoami",
+    "railway:link": "railway link",
+    "railway:up": "railway up",
+    "railway:logs": "railway logs",
+    "railway:variables": "railway variables"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
@@ -30,8 +37,11 @@
     "@types/pino": "^7.0.4",
     "@types/qrcode": "^1.5.6",
     "@types/qrcode-terminal": "^0.12.2",
-    "globals": "^15.14.0",
+    "checkly": "^6.9.7",
     "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "railway": "^2.0.17",
+    "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.19.0"

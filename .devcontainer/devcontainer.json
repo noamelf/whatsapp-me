@@ -6,7 +6,8 @@
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
   "mounts": [
-    "source=whatsapp-me-railway-config,target=/home/node/.railway,type=volume"
+    "source=whatsapp-me-railway-config,target=/home/node/.railway,type=volume",
+    "source=${localEnv:HOME}/Library/Preferences/@checkly,target=/home/node/.config/@checkly,type=bind"
   ],
   "customizations": {
     "vscode": {
@@ -16,15 +17,16 @@
         "ms-azuretools.vscode-docker"
       ],
       "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
         "editor.formatOnSave": true,
-        "editor.defaultFormatter": "esbenp.prettier-vscode",
         "typescript.preferences.importModuleSpecifier": "relative",
         "mcp": {
           "servers": {
             "railway": {
-              "command": "railway",
+              "command": "npx",
               "args": [
-                "mcp"
+                "-y",
+                "@railway/mcp-server"
               ]
             }
           }
@@ -32,6 +34,6 @@
       }
     }
   },
-  "postCreateCommand": "npm install && curl -fsSL https://railway.com/install.sh | sh && mkdir -p /home/node/.railway && sudo chown -R node:node /home/node/.railway",
+  "postCreateCommand": "bash .devcontainer/postCreate.sh",
   "remoteUser": "node"
 }

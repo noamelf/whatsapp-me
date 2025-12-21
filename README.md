@@ -115,22 +115,24 @@ This application connects to WhatsApp using the Baileys library, listens for mes
    - Display all messages in the console
 
 4. For development with auto-restart:
+
    ```
    npm run dev
    ```
 
 5. To test event detection without WhatsApp:
+
    ```bash
    # Set your token (from .env)
-   export TEST_TOKEN=7f42ab57ea7e98d7bd7784ca3aa48e3ebd168a8cd3ddc7c090f383a030b59067
-   
+   export TEST_TOKEN=your_test_endpoint_token_here
+
    # Run the test script
    ./test-endpoint.sh
-   
+
    # Or test against production
    ./test-endpoint.sh https://your-app.railway.app/test-message
    ```
-   
+
    See [TEST_ENDPOINT.md](TEST_ENDPOINT.md) for detailed API documentation.
 
 ## Testing Event Detection
@@ -141,18 +143,20 @@ The application includes a REST API endpoint for testing event detection without
 - **Port:** Same as health check (8080 in production, 3000 locally)
 - **Authentication:** Requires `TEST_ENDPOINT_TOKEN` (set in `.env`)
 - **Usage:**
+
   ```bash
   # Using curl with authentication
   curl -X POST http://localhost:8080/test-message \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer YOUR_TOKEN" \
     -d '{"text": "מחר בשעה 10:00 יש לנו פגישה בקפה נחלת בנימין"}'
-  
+
   # Using the test script (easier)
   TEST_TOKEN=your_token ./test-endpoint.sh
   ```
 
 **Features:**
+
 - Test event detection without WhatsApp
 - Support for text and base64-encoded images
 - Returns structured JSON with detected events
@@ -161,6 +165,37 @@ The application includes a REST API endpoint for testing event detection without
 
 For complete documentation, examples in multiple languages, and security best practices, see [TEST_ENDPOINT.md](TEST_ENDPOINT.md).
 
+## Checkly Monitoring
+
+This repo includes a Checkly monitoring-as-code setup for the `/test-message` API.
+
+- Config: [checkly.config.ts](checkly.config.ts)
+- API check: [**checks**/api-test.check.ts](__checks__/api-test.check.ts)
+
+Run locally and deploy:
+
+```fish
+# Install the Checkly CLI locally (optional if you use npx)
+npm install -D checkly
+
+# Set your production URL (override default if needed)
+set -x TEST_MESSAGE_URL https://your-app.up.railway.app/test-message
+
+# If your endpoint requires a token
+set -x TEST_ENDPOINT_TOKEN your-secret-token
+
+# Preview checks locally from eu-west-1
+npx checkly test
+
+# Authenticate and deploy checks to your Checkly account
+npx checkly login
+npx checkly deploy
+```
+
+Notes:
+
+- The check defaults to the example Railway URL from the docs.
+- Set `TEST_MESSAGE_URL` and `TEST_ENDPOINT_TOKEN` via Checkly environment variables for production.
 
 ## How It Works
 
