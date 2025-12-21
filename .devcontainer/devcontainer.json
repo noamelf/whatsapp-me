@@ -32,6 +32,6 @@
       }
     }
   },
-  "postCreateCommand": "npm install && curl -fsSL https://railway.com/install.sh | sh",
+  "postCreateCommand": "npm install && curl -fsSL https://railway.com/install.sh | sh && mkdir -p /home/node/.railway && sudo chown -R node:node /home/node/.railway",
   "remoteUser": "node"
 }
