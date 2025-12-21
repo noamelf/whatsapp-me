@@ -135,6 +135,5 @@ dist
 # macOS
 .DS_Store
 
-# Baileys
-.baileys_auth
+# Test output directory
 test-output/

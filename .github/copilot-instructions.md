@@ -110,7 +110,7 @@ Events extracted must conform to:
 
 - **Error Handling**: Graceful degradation when WhatsApp or OpenAI services are unavailable
 - **Logging**: Log message processing, event detection, and API calls for debugging
-- **Session Management**: Persist WhatsApp sessions to `auth_info` directory
+- **Session Management**: Persist WhatsApp sessions to `.baileys_auth` directory
 - **Async/Await**: Use async patterns for WhatsApp message listeners and API calls
 - **Type Safety**: Use TypeScript interfaces for event data and API responses
 - **Linting**: Always run `npm run lint` before committing to catch type errors and code quality issues
@@ -160,7 +160,7 @@ Events extracted must conform to:
 
 ### Debugging WhatsApp Issues
 
-1. Check `auth_info` directory for session persistence
+1. Check `.baileys_auth` directory for session persistence
 2. Review WhatsApp logs for connection status
 3. Test with `test-message.ts` to isolate OpenAI issues
 4. Verify chat filtering logic with console output

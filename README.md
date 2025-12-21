@@ -79,7 +79,7 @@ This application connects to WhatsApp using the Baileys library, listens for mes
    - Generate a secure token: `openssl rand -hex 32`
    - If set, the `/test-message` endpoint requires authentication
    - If not set, the endpoint is publicly accessible (not recommended for production)
-   - See [TEST_ENDPOINT.md](TEST_ENDPOINT.md) for usage examples
+   - See [TEST_ENDPOINT.md](docs/TEST_ENDPOINT.md) for usage examples
 
 4. (Optional) Add `ALLOWED_CHAT_NAMES` to your `.env` file to filter which chats are analyzed:
    ```
@@ -163,19 +163,7 @@ The application includes a REST API endpoint for testing event detection without
 - Token-based security (401 without valid token)
 - Ideal for CI/CD integration and automated testing
 
-For complete documentation, examples in multiple languages, and security best practices, see [TEST_ENDPOINT.md](TEST_ENDPOINT.md).
-
-## Checkly Monitoring
-
-This repo includes a Checkly monitoring-as-code setup for the `/test-message` API.
-
-- Config: [checkly.config.ts](checkly.config.ts)
-- API check: [**checks**/api-test.check.ts](__checks__/api-test.check.ts)
-
-Run locally and deploy:
-
-```fish
-# Install the Checkly CLI locally (optional if you use npx)
+For complete documentation, examples in multiple languages, and security best practices, see [TEST_ENDPOINT.md](docs/TEST_ENDPOINT.md).
 npm install -D checkly
 
 # Set your production URL (override default if needed)
@@ -249,7 +237,7 @@ src/
 
 ## Model Guide
 
-See the agent instructions in [SPEC.md](SPEC.md) under "Agent Instructions: Model Guide" for model selection and parameter constraints when modifying `openai-service.ts`.
+See the agent instructions in [docs/SPEC.md](docs/SPEC.md) under "Agent Instructions: Model Guide" for model selection and parameter constraints when modifying `openai-service.ts`.
 
 ## Agent Instructions: Railway Deployment
 

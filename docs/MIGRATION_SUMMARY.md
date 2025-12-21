@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project has been successfully migrated from `whatsapp-web.js` to `@whiskeysockets/baileys`. This migration brings significant improvements in performance, reliability, and resource usage while maintaining all the core functionality specified in the SPEC.md.
+This project has been successfully migrated from `whatsapp-web.js` to `@whiskeysockets/baileys`. This migration brings significant improvements in performance, reliability, and resource usage while maintaining all the core functionality specified in SPEC.md.
 
 ## Key Benefits of Migration
 
