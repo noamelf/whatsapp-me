@@ -167,17 +167,22 @@ For complete documentation, examples in multiple languages, and security best pr
 npm install -D checkly
 
 # Set your production URL (override default if needed)
+
 set -x TEST_MESSAGE_URL https://your-app.up.railway.app/test-message
 
 # If your endpoint requires a token
+
 set -x TEST_ENDPOINT_TOKEN your-secret-token
 
 # Preview checks locally from eu-west-1
+
 npx checkly test
 
 # Authenticate and deploy checks to your Checkly account
+
 npx checkly login
 npx checkly deploy
+
 ```
 
 Notes:
@@ -229,10 +234,12 @@ When a day of the week is mentioned without "next" (e.g., just "Monday"), the ap
 ## Project Structure
 
 ```
+
 src/
-├── index.ts              # Main application entry point
-├── whatsapp-client.ts    # Baileys WhatsApp client wrapper
-└── openai-service.ts     # OpenAI API integration for event detection
+├── index.ts # Main application entry point
+├── whatsapp-client.ts # Baileys WhatsApp client wrapper
+└── openai-service.ts # OpenAI API integration for event detection
+
 ```
 
 ## Model Guide
@@ -250,3 +257,4 @@ See the agent instructions in [docs/SPEC.md](docs/SPEC.md) under "Agent Instruct
 ## License
 
 MIT
+```
