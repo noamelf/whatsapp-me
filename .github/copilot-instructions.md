@@ -85,16 +85,17 @@ Events extracted must conform to:
 
 ### Model Selection
 
-- **gpt-4o (primary)** or **gpt-4o-mini**: Recommended for balanced cost/accuracy
-- **gpt-4-turbo**: For complex/ambiguous messages with multiple events
-- **gpt-4**: For simple classification or when cost is critical
+- **gpt-5-mini**: Cost-optimized default; supports text+image and structured outputs.
+- **gpt-5.2**: Use for complex/ambiguous messages or multi-event reasoning; prefer Responses API when leveraging reasoning features.
+- **gpt-5.2-pro**: Use sparingly for very tough cases requiring deeper reasoning at higher cost.
+- **gpt-5-nano**: High-throughput simple tasks; consider only for lightweight classification/pre-filtering.
 
-### API Requirements
+### API Constraints
 
-- **Output Format**: Use `response_format: { type: "json_object" }` for structured JSON
-- **Max Tokens**: Use `max_completion_tokens` parameter (not `max_tokens`)
-- **Temperature**: Only use when explicitly needed, avoid for structured outputs
-- **Vision Support**: Can include images via data URIs in message content
+- Always use `response_format: { type: "json_object" }` and `max_completion_tokens` (not `max_tokens`).
+- Do not send `temperature`, `top_p`, or `logprobs` to `gpt-5-mini`. For `gpt-5.2`, these are only supported with Responses API when `reasoning.effort = "none"`; avoid otherwise. Keep temperature low/omitted for structured outputs.
+- Vision: include images via `messages[].content` with an `image_url` item using `data:<mime>;base64,<payload>` and `detail: "auto"`.
+- Model reference: https://platform.openai.com/docs/models for updates on available models and parameters.
 
 ### Prompting Rules
 
