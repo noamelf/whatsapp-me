@@ -14,7 +14,11 @@ import * as fs from "fs";
 import * as path from "path";
 import * as qrcode from "qrcode-terminal";
 import NodeCache from "node-cache";
-import { OpenAIService, EventDetails } from "./openai-service";
+import {
+  OpenAIService,
+  EventDetails,
+  MultiEventResult,
+} from "./openai-service";
 
 type WASocketType = ReturnType<typeof makeWASocket>;
 
@@ -350,29 +354,35 @@ export class WhatsAppClient {
         contactName
       );
 
-      if (analysis.isEvent && analysis.summary) {
-        console.log(`Event detected! Summary: ${analysis.summary}`);
-        console.log(`Event details:`, {
-          title: analysis.title,
-          date: analysis.date,
-          time: analysis.time,
-          location: analysis.location,
-          description: analysis.description,
-          startDateISO: analysis.startDateISO,
-          endDateISO: analysis.endDateISO,
-        });
+      if (analysis.hasEvents && analysis.events.length > 0) {
+        console.log(`${analysis.events.length} event(s) detected!`);
 
-        // If we found the target group, send the event details
-        if (this.targetGroupId) {
-          // Send the combined event message (details + calendar attachment)
-          if (analysis.title && analysis.startDateISO) {
-            await this.sendEventToGroup(this.targetGroupId, analysis);
-            console.log(`Event sent to "${this.targetGroupName}" group`);
+        for (const event of analysis.events) {
+          if (event.isEvent && event.summary) {
+            console.log(`Event detected! Summary: ${event.summary}`);
+            console.log(`Event details:`, {
+              title: event.title,
+              date: event.date,
+              time: event.time,
+              location: event.location,
+              description: event.description,
+              startDateISO: event.startDateISO,
+              endDateISO: event.endDateISO,
+            });
+
+            // If we found the target group, send the event details
+            if (this.targetGroupId) {
+              // Send the combined event message (details + calendar attachment)
+              if (event.title && event.startDateISO) {
+                await this.sendEventToGroup(this.targetGroupId, event);
+                console.log(`Event sent to "${this.targetGroupName}" group`);
+              }
+            } else {
+              console.log(
+                `Target group "${this.targetGroupName}" not found. Event not sent.`
+              );
+            }
           }
-        } else {
-          console.log(
-            `Target group "${this.targetGroupName}" not found. Event not sent.`
-          );
         }
       }
     } catch (error) {

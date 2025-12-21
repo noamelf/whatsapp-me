@@ -8,6 +8,7 @@ This application connects to WhatsApp using the Baileys library, listens for mes
 - Reuse existing sessions to avoid repeated QR code scanning
 - Listen for all incoming WhatsApp messages in real-time
 - Analyze messages using OpenAI to detect events
+- **Support for multiple events in a single message** - Extract all events when a message contains more than one
 - Extract structured event details (title, date, time, location, description)
 - Create summaries of detected events
 - Send event summaries to a designated WhatsApp group
@@ -35,33 +36,39 @@ This application connects to WhatsApp using the Baileys library, listens for mes
    npm install
    ```
 3. Create a `.env` file in the root directory (copy from `.env.example`):
+
    ```
    cp .env.example .env
    ```
+
    Then configure the following variables:
-   
+
    **Required:**
+
    ```
    OPENAI_API_KEY=your_api_key_here
    ```
-   
+
    **Target Group Configuration (choose one):**
+
    ```
    # Option 1: Use target group ID directly (recommended if you know it)
    TARGET_GROUP_ID=120363123456789012@g.us
-   
+
    # Option 2: Use target group name for automatic search
    TARGET_GROUP_NAME=אני
    ```
+
    - If `TARGET_GROUP_ID` is provided, it will be used directly (faster and more reliable)
    - If only `TARGET_GROUP_NAME` is provided, the bot will search for the group by name
    - If neither is provided, defaults to searching for a group named "אני"
-   
+
    **Finding your WhatsApp Group ID:**
+
    - Run the bot once with `TARGET_GROUP_NAME` configured
    - When the bot finds your group, it will log the group ID in the console
    - Copy that ID and use it as `TARGET_GROUP_ID` for better performance
-   
+
 4. (Optional) Add `ALLOWED_CHAT_NAMES` to your `.env` file to filter which chats are analyzed:
    ```
    ALLOWED_CHAT_NAMES=Family Group,Work Team,Book Club
@@ -74,17 +81,20 @@ This application connects to WhatsApp using the Baileys library, listens for mes
 ## Usage
 
 1. Start the application:
+
    ```
    npm start
    ```
 
 2. If this is your first time running the application, you'll need to scan a QR code to authenticate with WhatsApp:
+
    - A QR code will be displayed in your terminal
    - Open WhatsApp on your phone
    - Go to Settings > Linked Devices
    - Tap "Link a Device" and scan the QR code
 
 3. After authentication, the application will:
+
    - Connect to WhatsApp using WebSocket (no browser required)
    - Listen for all WhatsApp messages
    - Analyze messages to detect events

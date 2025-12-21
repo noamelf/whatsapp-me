@@ -16,6 +16,11 @@ export interface EventDetails {
   endDateISO: string | null;
 }
 
+export interface MultiEventResult {
+  hasEvents: boolean;
+  events: EventDetails[];
+}
+
 export class OpenAIService {
   private openai: OpenAI;
   private messageHistory: Map<string, string[]> = new Map();
@@ -74,14 +79,14 @@ export class OpenAIService {
   }
 
   /**
-   * Analyze a message to detect if it contains an event
+   * Analyze a message to detect if it contains one or more events
    */
   public async analyzeMessage(
     chatId: string,
     message: string,
     chatName: string,
     sender?: string
-  ): Promise<EventDetails> {
+  ): Promise<MultiEventResult> {
     try {
       // Check if the chat is allowed
       if (!this.isChatAllowed(chatName || chatId)) {
@@ -90,15 +95,8 @@ export class OpenAIService {
         );
         console.log(`Allowed list:`, JSON.stringify(this.allowedChatNames));
         return {
-          isEvent: false,
-          summary: null,
-          title: null,
-          date: null,
-          time: null,
-          location: null,
-          description: null,
-          startDateISO: null,
-          endDateISO: null,
+          hasEvents: false,
+          events: [],
         };
       }
 
@@ -107,12 +105,13 @@ export class OpenAIService {
 
       // Create the prompt for OpenAI
       const prompt = `
-Analyze the following WhatsApp message and determine if it contains information about an event (like a meeting, party, gathering, etc.).
-Events usually contains a day reference, like "יום ראשון" or "יום שני" or "יום שלישי" or "יום רביעי" or "יום חמישי" or "יום שישי" or "יום שבת" 
+Analyze the following WhatsApp message and determine if it contains information about one or more events (like meetings, parties, gatherings, etc.).
+A message can contain MULTIPLE events - make sure to extract ALL of them.
+Events usually contain a day reference, like "יום ראשון" or "יום שני" or "יום שלישי" or "יום רביעי" or "יום חמישי" or "יום שישי" or "יום שבת" 
 It could also be a specific date. It doesn't have to include all information like location.
 If the message only tries to find a good time to meet, it's not an event.
 
-If it is an event, extract the following details:
+For EACH event detected, extract the following details:
 1. Title - A short title for the event (in Hebrew if possible)
 2. Date - The date of the event (e.g., "Monday", "יום שני", "Tomorrow", "Next Friday", "12/25/2023")
 3. Time - The time of the event (e.g., "3:00 PM", "15:00", "בשעה 18:00")
@@ -131,18 +130,24 @@ Sender: ${sender || "Unknown"}
 
 Respond in the following JSON format:
 {
-  "isEvent": true/false,
-  "summary": "A brief Hebrew summary of the event (1-2 sentences)",
-  "title": "Short event title in Hebrew",
-  "date": "Event date in Hebrew (e.g., היום, מחר, יום שני)",
-  "time": "Event time (e.g., 12:00)",
-  "location": "Event location in Hebrew if mentioned, otherwise null",
-  "description": "Brief description of the event in Hebrew (do NOT include the original message)",
-  "startDateISO": "YYYY-MM-DDTHH:MM:SS.sssZ",
-  "endDateISO": "YYYY-MM-DDTHH:MM:SS.sssZ"
+  "hasEvents": true/false,
+  "events": [
+    {
+      "isEvent": true,
+      "summary": "A brief Hebrew summary of the event (1-2 sentences)",
+      "title": "Short event title in Hebrew",
+      "date": "Event date in Hebrew (e.g., היום, מחר, יום שני)",
+      "time": "Event time (e.g., 12:00)",
+      "location": "Event location in Hebrew if mentioned, otherwise null",
+      "description": "Brief description of the event in Hebrew (do NOT include the original message)",
+      "startDateISO": "YYYY-MM-DDTHH:MM:SS.sssZ",
+      "endDateISO": "YYYY-MM-DDTHH:MM:SS.sssZ"
+    }
+  ]
 }
 
-If it's not an event, just set isEvent to false and leave the other fields as null.
+If no events are found, set hasEvents to false and events to an empty array [].
+If multiple events are found, include ALL of them in the events array.
 For all text fields, use Hebrew.
 Keep the description brief and clean - do not repeat the original message text.
 
@@ -157,7 +162,7 @@ For the startDateISO and endDateISO fields:
         "en-US",
         { year: "numeric" }
       )})
-5. If there is no month mentioned, assume the current year (${new Date().toLocaleDateString(
+5. If there is no month mentioned, assume the current month (${new Date().toLocaleDateString(
         "en-US",
         { month: "long" }
       )})
@@ -173,12 +178,12 @@ For the startDateISO and endDateISO fields:
           {
             role: "system",
             content:
-              "You are a helpful assistant that analyzes WhatsApp messages to detect events and extract structured details. For Hebrew content, provide Hebrew output for summary, title, and location. You are also skilled at converting dates and times to ISO format.",
+              "You are a helpful assistant that analyzes WhatsApp messages to detect events and extract structured details. A single message can contain MULTIPLE events - make sure to extract ALL of them. For Hebrew content, provide Hebrew output for summary, title, and location. You are also skilled at converting dates and times to ISO format.",
           },
           { role: "user", content: prompt },
         ],
         temperature: 0.3,
-        max_tokens: 500,
+        max_tokens: 1500,
         response_format: { type: "json_object" },
       });
 
@@ -188,53 +193,68 @@ For the startDateISO and endDateISO fields:
         // Parse the JSON response
         const parsedResponse = JSON.parse(content);
 
-        const description = parsedResponse.description || null;
+        const hasEvents = parsedResponse.hasEvents === true;
+        const events: EventDetails[] = [];
+
+        if (hasEvents && Array.isArray(parsedResponse.events)) {
+          for (const event of parsedResponse.events) {
+            events.push({
+              isEvent: true,
+              summary: event.summary || null,
+              title: event.title || null,
+              date: event.date || null,
+              time: event.time || null,
+              location: event.location || null,
+              description: event.description || null,
+              startDateISO: event.startDateISO || null,
+              endDateISO: event.endDateISO || null,
+            });
+          }
+        }
 
         return {
-          isEvent: parsedResponse.isEvent === true,
-          summary: parsedResponse.summary || null,
-          title: parsedResponse.title || null,
-          date: parsedResponse.date || null,
-          time: parsedResponse.time || null,
-          location: parsedResponse.location || null,
-          description: description,
-          startDateISO: parsedResponse.startDateISO || null,
-          endDateISO: parsedResponse.endDateISO || null,
+          hasEvents,
+          events,
         };
       } catch (parseError) {
         console.error("Error parsing OpenAI response:", parseError);
         console.log("Raw response:", content);
 
         // Fallback to basic parsing if JSON parsing fails
-        const isEvent =
-          content.includes('"isEvent": true') ||
-          content.includes('"isEvent":true');
+        const hasEvents =
+          content.includes('"hasEvents": true') ||
+          content.includes('"hasEvents":true');
         const summaryMatch = content.match(/"summary":\s*"([^"]*)"/);
 
+        if (hasEvents && summaryMatch) {
+          return {
+            hasEvents: true,
+            events: [
+              {
+                isEvent: true,
+                summary: summaryMatch[1],
+                title: null,
+                date: null,
+                time: null,
+                location: null,
+                description: null,
+                startDateISO: null,
+                endDateISO: null,
+              },
+            ],
+          };
+        }
+
         return {
-          isEvent,
-          summary: summaryMatch ? summaryMatch[1] : null,
-          title: null,
-          date: null,
-          time: null,
-          location: null,
-          description: null,
-          startDateISO: null,
-          endDateISO: null,
+          hasEvents: false,
+          events: [],
         };
       }
     } catch (error) {
       console.error("Error analyzing message with OpenAI:", error);
       return {
-        isEvent: false,
-        summary: null,
-        title: null,
-        date: null,
-        time: null,
-        location: null,
-        description: null,
-        startDateISO: null,
-        endDateISO: null,
+        hasEvents: false,
+        events: [],
       };
     }
   }
