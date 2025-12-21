@@ -102,3 +102,63 @@ A system that automatically monitors WhatsApp conversations, identifies event-re
 - **Resource Efficiency**: Operate without significant system impact
 - **Stable Operation**: Maintain consistent performance over time
 - **Scalable Processing**: Handle varying message volumes effectively 
+
+## Agent Instructions: Model Guide
+
+### Overview
+The system uses OpenAI GPT‑5 family models to analyze WhatsApp messages and extract structured event data. Choose the model based on the task complexity and cost profile, and follow the parameter rules to avoid API errors.
+
+### Available Models and When to Use
+- **gpt-5-mini**: Cost‑optimized default for event extraction. Use for most conversations; supports text + image input and structured outputs.
+- **gpt-5.2**: Use for complex or ambiguous messages where reasoning is beneficial (e.g., multiple events intertwined, sparse context, heavy image interpretation). Prefer the Responses API when leveraging reasoning features.
+- **gpt-5.2-pro**: Use sparingly for very tough cases that require deeper thinking at higher cost.
+- **gpt-5-nano**: High‑throughput simple tasks. Not recommended for nuanced event extraction; consider for lightweight classification or pre‑filtering.
+
+### API Endpoint Guidance
+- **Chat Completions API**: Supported for gpt‑5‑mini and gpt‑5.2 for text + image inputs and structured JSON outputs.
+- **Responses API**: Preferred for gpt‑5.2 when using reasoning features (e.g., passing previous reasoning items). Not required for standard event extraction.
+
+### Required Parameters and Constraints
+- **Output tokens**: Use `max_completion_tokens` (not `max_tokens`).
+- **Structured outputs**: Use `response_format: { type: "json_object" }` to receive parseable JSON.
+- **Temperature/top_p/logprobs**: Do not send these to `gpt-5-mini`. They are unsupported and will raise errors. For `gpt-5.2`, these are only supported when using Responses API with `reasoning.effort` set to `none`; otherwise avoid them.
+- **Vision inputs**: Include images via `messages[].content` using an `image_url` item with a data URI: `data:<mime>;base64,<payload>` and `detail: "auto"`.
+
+### Output Schema Requirements
+Models must return JSON conforming to:
+```
+{
+  "hasEvents": boolean,
+  "events": [
+    {
+      "isEvent": boolean,
+      "summary": string|null,
+      "title": string|null,
+      "date": string|null,
+      "time": string|null,
+      "location": string|null,
+      "description": string|null,
+      "startDateISO": string|null,
+      "endDateISO": string|null
+    }
+  ]
+}
+```
+
+### Prompting and Locale Rules
+- Provide Hebrew outputs for `summary`, `title`, `location`, and textual fields when the content is Hebrew.
+- Keep `description` concise; do not repeat the raw message text.
+- Extract all events in a single message (supporting multiple events).
+- Convert date/time to Israel timezone and ISO format; apply defaults when missing (start 08:00, duration 1 hour).
+
+### Model Selection Policy
+- **Default**: `gpt-5-mini` for cost efficiency and strong baseline performance.
+- **Escalate to `gpt-5.2`** when:
+  - Repeated parse failures or inconsistent JSON.
+  - Complex, multi‑event threads or heavy visual content.
+  - Ambiguity requiring stronger reasoning.
+- **Fallback**: Return to `gpt-5-mini` for routine processing once the edge case is handled.
+
+### Error Handling
+- If JSON parsing fails, log the raw content and retry once without optional parameters (e.g., image `detail`), maintaining the same output schema.
+- Do not include unsupported parameters for the selected model; prefer prompt tuning over temperature/top_p.

@@ -264,10 +264,7 @@ export class WhatsAppClient {
         fireInitQueries: true,
         generateHighQualityLinkPreview: false,
         logger,
-        cachedGroupMetadata: (jid) =>
-          Promise.resolve(
-            (this.groupCache.get(jid) as GroupMetadata) || undefined
-          ),
+        cachedGroupMetadata: async (jid) => this.groupCache.get(jid),
         getMessage: (_key: WAMessageKey) => {
           // Return empty message for now - could be enhanced with message store
           return Promise.resolve({ conversation: "" });

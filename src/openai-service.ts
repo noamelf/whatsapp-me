@@ -1,3 +1,28 @@
+/**
+ * Agent Instructions: OpenAI Model Guide
+ *
+ * Models:
+ * - Default: gpt-5-mini (cost-optimized; supports text+image, structured outputs)
+ * - Escalation: gpt-5.2 for complex/ambiguous cases; prefer Responses API if using reasoning
+ *
+ * Parameters:
+ * - Use `max_completion_tokens` (not `max_tokens`)
+ * - Use `response_format: { type: "json_object" }` for structured output
+ * - Do NOT send `temperature`, `top_p`, or `logprobs` to gpt-5-mini (will error)
+ * - For gpt-5.2, these are only supported with Responses API when `reasoning.effort = "none"`
+ *
+ * Vision:
+ * - Pass images via messages[].content using an `image_url` item with data URI
+ *   (data:<mime>;base64,<payload>) and `detail: "auto"`
+ *
+ * Output schema:
+ * - Must match MultiEventResult with Hebrew fields when content is Hebrew
+ * - Convert dates to Israel timezone and ISO; apply defaults when missing
+ *
+ * Policy:
+ * - Start with gpt-5-mini; escalate to gpt-5.2 on repeated parse failures,
+ *   multi-event ambiguity, or heavy visual content requiring stronger reasoning
+ */
 import OpenAI from "openai";
 import dotenv from "dotenv";
 

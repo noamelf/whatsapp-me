@@ -157,6 +157,18 @@ src/
 └── openai-service.ts     # OpenAI API integration for event detection
 ```
 
+## Model Guide
+
+See the agent instructions in [SPEC.md](SPEC.md) under "Agent Instructions: Model Guide" for model selection and parameter constraints when modifying `openai-service.ts`.
+
+## Agent Instructions: Railway Deployment
+
+- Builder: Dockerfile (see `railway.toml`); entrypoint `node dist/index.js` after `npm run build`.
+- Persistent volume: keep the mount at `/app/.baileys_auth` (stores Baileys auth and `group_cache.json` for metadata caching); do not remove or rename it.
+- Required env: `OPENAI_API_KEY`; target group via `TARGET_GROUP_ID` (preferred) or `TARGET_GROUP_NAME`; optional `ALLOWED_CHAT_NAMES` filter.
+- Healthcheck: `/health` with 300s timeout is configured in `railway.toml`; ensure the endpoint stays light and available on startup.
+- Deploy: `railway up` (or via GitHub trigger) builds with the Dockerfile; inspect runtime issues with `railway logs --service <service>` and confirm the volume mount is present.
+
 ## License
 
 MIT
