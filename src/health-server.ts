@@ -24,7 +24,7 @@ export class HealthServer {
     this.statusProvider = statusProvider;
   }
 
-  public start(port: number = 3000): void {
+  public start(port = 3000): void {
     this.server = http.createServer((req, res) => {
       // Only respond to GET /health or GET /
       if (req.method === "GET" && (req.url === "/health" || req.url === "/")) {

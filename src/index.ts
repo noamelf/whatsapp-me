@@ -71,7 +71,7 @@ async function main() {
 }
 
 // Handle graceful shutdown
-process.on("SIGINT", async () => {
+process.on("SIGINT", () => {
   console.log("\nShutting down...");
   console.log(
     "Your session has been saved. You can restart the application without scanning the QR code again."
@@ -95,10 +95,10 @@ process.on("uncaughtException", (error) => {
 });
 
 // Handle unhandled promise rejections
-process.on("unhandledRejection", (reason, promise) => {
+process.on("unhandledRejection", (reason, _promise) => {
   console.error("Unhandled promise rejection:", reason);
   process.exit(1);
 });
 
 // Start the application
-main();
+void main();

@@ -117,7 +117,7 @@ async function testMessage(message: string): Promise<void> {
   }
 }
 
-async function interactiveMode(): Promise<void> {
+function interactiveMode(): void {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,

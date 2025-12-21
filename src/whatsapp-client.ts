@@ -8,6 +8,10 @@ import makeWASocket, {
   WAMessage,
   Browsers,
   downloadMediaMessage,
+  type GroupMetadata,
+  type WAConnectionState,
+  type Chat,
+  type GroupParticipant,
 } from "@whiskeysockets/baileys";
 import pino from "pino";
 import { Boom } from "@hapi/boom";
@@ -16,31 +20,50 @@ import * as path from "path";
 import * as qrcode from "qrcode-terminal";
 import * as QRCode from "qrcode";
 import NodeCache from "node-cache";
-import {
-  OpenAIService,
-  EventDetails,
-  MultiEventResult,
-} from "./openai-service";
+import { OpenAIService, type EventDetails } from "./openai-service";
+
+// Type for cached group data persisted to file
+interface PersistedCacheData {
+  data: GroupMetadata;
+  savedAt: number;
+}
+
+// Type for connection update from Baileys
+interface BaileysConnectionUpdate {
+  connection?: WAConnectionState;
+  lastDisconnect?: {
+    error?: Boom | Error;
+    date?: Date;
+  };
+  qr?: string;
+}
+
+// Type for messages upsert event
+interface MessagesUpsert {
+  messages: WAMessage[];
+  type: string;
+}
 
 type WASocketType = ReturnType<typeof makeWASocket>;
 
 export class WhatsAppClient {
   private socket: WASocketType | null = null;
-  private isReady: boolean = false;
-  private hasEverConnected: boolean = false;
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 3;
+  private isReady = false;
+  private hasEverConnected = false;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 3;
   private readonly sessionDir = process.env.BAILEYS_AUTH_DIR || ".baileys_auth";
   private readonly cacheFilePath: string;
   private openaiService: OpenAIService;
-  private targetGroupName: string = "אני"; // Default target group name (can be overridden via TARGET_GROUP_NAME env var)
+  private targetGroupName = "אני"; // Default target group name (can be overridden via TARGET_GROUP_NAME env var)
   private targetGroupId: string | null = null;
-  private shouldReconnect: boolean = true;
-  private connectionState: string = "close";
-  private groupCache = new NodeCache({ stdTTL: 30 * 60, useClones: false }); // 30 minute TTL
+  private shouldReconnect = true;
+  private connectionState: WAConnectionState = "close";
+  private groupCache: NodeCache;
   private cacheFlushInterval: NodeJS.Timeout | null = null;
 
   constructor() {
+    this.groupCache = new NodeCache({ stdTTL: 30 * 60, useClones: false }); // 30 minute TTL
     this.cacheFilePath = path.join(this.sessionDir, "group_cache.json");
     this.openaiService = new OpenAIService();
 
@@ -54,14 +77,17 @@ export class WhatsAppClient {
     this.loadCacheFromFile();
 
     // Set up periodic cache saving (every 5 minutes)
-    this.cacheFlushInterval = setInterval(
-      () => this.saveCacheToFile(),
-      5 * 60 * 1000
-    );
+    this.cacheFlushInterval = setInterval(() => {
+      this.saveCacheToFile();
+    }, 5 * 60 * 1000);
 
     // Save cache on process exit
-    process.on("SIGTERM", () => this.saveCacheToFile());
-    process.on("SIGINT", () => this.saveCacheToFile());
+    process.on("SIGTERM", () => {
+      this.saveCacheToFile();
+    });
+    process.on("SIGINT", () => {
+      this.saveCacheToFile();
+    });
   }
 
   private configureTargetGroup(): void {
@@ -103,10 +129,10 @@ export class WhatsAppClient {
   private saveCacheToFile(): void {
     try {
       const keys = this.groupCache.keys();
-      const cacheData: Record<string, { data: any; savedAt: number }> = {};
+      const cacheData: Record<string, PersistedCacheData> = {};
 
       for (const key of keys) {
-        const value = this.groupCache.get(key);
+        const value = this.groupCache.get(key) as GroupMetadata | undefined;
         if (value) {
           cacheData[key] = {
             data: value,
@@ -140,8 +166,7 @@ export class WhatsAppClient {
       }
 
       const data = fs.readFileSync(this.cacheFilePath, "utf-8");
-      const cacheData: Record<string, { data: any; savedAt: number }> =
-        JSON.parse(data);
+      const cacheData = JSON.parse(data) as Record<string, PersistedCacheData>;
 
       const maxAge = 24 * 60 * 60 * 1000; // 24 hours max age for persisted cache
       let loadedCount = 0;
@@ -170,22 +195,28 @@ export class WhatsAppClient {
    */
   private async fetchGroupMetadataWithRetry(
     groupId: string,
-    maxRetries: number = 3
-  ): Promise<any | null> {
+    maxRetries = 3
+  ): Promise<GroupMetadata | null> {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         // Check cache first
-        const cached = this.groupCache.get(groupId);
+        const cached = this.groupCache.get(groupId) as
+          | GroupMetadata
+          | undefined;
         if (cached) {
           return cached;
         }
 
-        const metadata = await this.socket!.groupMetadata(groupId);
+        if (!this.socket) {
+          return null;
+        }
+        const metadata = await this.socket.groupMetadata(groupId);
         this.groupCache.set(groupId, metadata);
         return metadata;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { data?: number; message?: string };
         const isRateLimit =
-          error?.data === 429 || error?.message?.includes("rate-overlimit");
+          err.data === 429 || err.message?.includes("rate-overlimit");
 
         if (isRateLimit && attempt < maxRetries - 1) {
           // Exponential backoff: 2s, 4s, 8s...
@@ -199,7 +230,7 @@ export class WhatsAppClient {
         } else if (!isRateLimit) {
           console.error(
             `Error fetching group metadata for ${groupId}:`,
-            error.message || error
+            err.message ?? error
           );
           return null;
         }
@@ -233,10 +264,13 @@ export class WhatsAppClient {
         fireInitQueries: true,
         generateHighQualityLinkPreview: false,
         logger,
-        cachedGroupMetadata: async (jid) => this.groupCache.get(jid),
-        getMessage: async (key: WAMessageKey) => {
+        cachedGroupMetadata: (jid) =>
+          Promise.resolve(
+            (this.groupCache.get(jid) as GroupMetadata) || undefined
+          ),
+        getMessage: (_key: WAMessageKey) => {
           // Return empty message for now - could be enhanced with message store
-          return { conversation: "" } as any;
+          return Promise.resolve({ conversation: "" });
         },
       });
 
@@ -251,142 +285,158 @@ export class WhatsAppClient {
     if (!this.socket) return;
 
     // Handle connection updates
-    this.socket.ev.on("connection.update", async (update: any) => {
-      const { connection, lastDisconnect, qr } = update;
+    this.socket.ev.on(
+      "connection.update",
+      async (update: BaileysConnectionUpdate) => {
+        const { connection, lastDisconnect, qr } = update;
 
-      if (qr) {
-        console.log(
-          "QR Code received. Please scan with your WhatsApp mobile app."
-        );
-        // Generate terminal QR code
-        qrcode.generate(qr, { small: true });
+        if (qr) {
+          console.log(
+            "QR Code received. Please scan with your WhatsApp mobile app."
+          );
+          // Generate terminal QR code
+          qrcode.generate(qr, { small: true });
 
-        // Generate a secure data URL that can be opened locally in a browser
-        // This is secure because the QR data never leaves your machine
-        try {
-          const qrDataUrl = await QRCode.toDataURL(qr, { width: 300 });
+          // Generate a secure data URL that can be opened locally in a browser
+          // This is secure because the QR data never leaves your machine
+          try {
+            const qrDataUrl = await QRCode.toDataURL(qr, { width: 300 });
+            console.log(
+              "\n📱 Can't see the QR code? Copy and paste this URL into your browser:"
+            );
+            console.log(qrDataUrl);
+            console.log("");
+          } catch {
+            console.log(
+              "\n📱 Can't see the QR code? Try adjusting your terminal size."
+            );
+          }
+        }
+
+        if (connection === "close") {
+          this.connectionState = "close";
+          this.isReady = false;
+
+          const shouldReconnect =
+            (lastDisconnect?.error as Boom)?.output?.statusCode !==
+            DisconnectReason.loggedOut;
           console.log(
-            "\n📱 Can't see the QR code? Copy and paste this URL into your browser:"
+            "Connection closed due to:",
+            lastDisconnect?.error,
+            ", reconnecting:",
+            shouldReconnect
           );
-          console.log(qrDataUrl);
-          console.log("");
-        } catch (err) {
-          console.log(
-            "\n📱 Can't see the QR code? Try adjusting your terminal size."
-          );
+
+          if (
+            shouldReconnect &&
+            this.shouldReconnect &&
+            this.reconnectAttempts < this.maxReconnectAttempts
+          ) {
+            this.reconnectAttempts++;
+            console.log(
+              `Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+            );
+
+            // Wait before reconnecting
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+            await this.createSocket();
+          } else if (!shouldReconnect) {
+            console.log(
+              "Logged out. Please restart the application and scan QR code again."
+            );
+          } else {
+            console.log(
+              "Max reconnection attempts reached. Please restart the application."
+            );
+          }
+        } else if (connection === "open") {
+          this.connectionState = "open";
+          this.isReady = true;
+          this.hasEverConnected = true;
+          this.reconnectAttempts = 0;
+          console.log("WhatsApp connection opened successfully!");
+
+          // Find the target group when connection is established
+          await this.findTargetGroup();
+        } else if (connection === "connecting") {
+          this.connectionState = "connecting";
+          console.log("Connecting to WhatsApp...");
         }
       }
-
-      if (connection === "close") {
-        this.connectionState = "close";
-        this.isReady = false;
-
-        const shouldReconnect =
-          (lastDisconnect?.error as Boom)?.output?.statusCode !==
-          DisconnectReason.loggedOut;
-        console.log(
-          "Connection closed due to:",
-          lastDisconnect?.error,
-          ", reconnecting:",
-          shouldReconnect
-        );
-
-        if (
-          shouldReconnect &&
-          this.shouldReconnect &&
-          this.reconnectAttempts < this.maxReconnectAttempts
-        ) {
-          this.reconnectAttempts++;
-          console.log(
-            `Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`
-          );
-
-          // Wait before reconnecting
-          await new Promise((resolve) => setTimeout(resolve, 5000));
-          await this.createSocket();
-        } else if (!shouldReconnect) {
-          console.log(
-            "Logged out. Please restart the application and scan QR code again."
-          );
-        } else {
-          console.log(
-            "Max reconnection attempts reached. Please restart the application."
-          );
-        }
-      } else if (connection === "open") {
-        this.connectionState = "open";
-        this.isReady = true;
-        this.hasEverConnected = true;
-        this.reconnectAttempts = 0;
-        console.log("WhatsApp connection opened successfully!");
-
-        // Find the target group when connection is established
-        await this.findTargetGroup();
-      } else if (connection === "connecting") {
-        this.connectionState = "connecting";
-        console.log("Connecting to WhatsApp...");
-      }
-    });
+    );
 
     // Handle credential updates
     this.socket.ev.on("creds.update", saveCreds);
 
     // Handle incoming messages
-    this.socket.ev.on("messages.upsert", async (messageUpdate: any) => {
-      const { messages, type } = messageUpdate;
+    this.socket.ev.on(
+      "messages.upsert",
+      async (messageUpdate: MessagesUpsert) => {
+        const { messages, type } = messageUpdate;
 
-      if (type !== "notify") return;
+        if (type !== "notify") return;
 
-      for (const message of messages) {
-        await this.handleIncomingMessage(message);
+        for (const message of messages) {
+          await this.handleIncomingMessage(message);
+        }
       }
-    });
+    );
 
     // Handle group updates
-    this.socket.ev.on("groups.update", async (updates: any[]) => {
-      // Process updates with a small delay between each to avoid rate limiting
-      for (const update of updates) {
-        // Update group metadata cache with rate limiting
-        const metadata = await this.fetchGroupMetadataWithRetry(update.id);
-        if (metadata) {
-          console.log(
-            `Updated group metadata cache for: ${metadata.subject || update.id}`
-          );
-        }
-
-        if (update.subject && !this.targetGroupId) {
-          // Check if this is our target group (only if not already configured from env)
-          if (update.subject === this.targetGroupName) {
-            this.targetGroupId = update.id;
+    this.socket.ev.on(
+      "groups.update",
+      async (updates: Partial<GroupMetadata>[]) => {
+        // Process updates with a small delay between each to avoid rate limiting
+        for (const update of updates) {
+          if (!update.id) continue;
+          // Update group metadata cache with rate limiting
+          const metadata = await this.fetchGroupMetadataWithRetry(update.id);
+          if (metadata) {
             console.log(
-              `Found target group "${this.targetGroupName}" with ID: ${this.targetGroupId}`
+              `Updated group metadata cache for: ${
+                metadata.subject || update.id
+              }`
             );
           }
-        }
 
-        // Small delay between processing updates to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 500));
+          if (update.subject && !this.targetGroupId) {
+            // Check if this is our target group (only if not already configured from env)
+            if (update.subject === this.targetGroupName) {
+              this.targetGroupId = update.id;
+              console.log(
+                `Found target group "${this.targetGroupName}" with ID: ${this.targetGroupId}`
+              );
+            }
+          }
+
+          // Small delay between processing updates to avoid rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
       }
-    });
+    );
 
     // Handle group participants update
-    this.socket.ev.on("group-participants.update", async (event: any) => {
-      // Update group metadata cache when participants change with rate limiting
-      const metadata = await this.fetchGroupMetadataWithRetry(event.id);
-      if (metadata) {
-        console.log(
-          `Updated group metadata cache for participant change in: ${
-            metadata.subject || event.id
-          }`
-        );
+    this.socket.ev.on(
+      "group-participants.update",
+      async (event: { id: string }) => {
+        // Update group metadata cache when participants change with rate limiting
+        const metadata = await this.fetchGroupMetadataWithRetry(event.id);
+        if (metadata) {
+          console.log(
+            `Updated group metadata cache for participant change in: ${
+              metadata.subject || event.id
+            }`
+          );
+        }
       }
-    });
+    );
 
     // Handle chats update
-    this.socket.ev.on("chats.upsert", async (chats: any[]) => {
+    this.socket.ev.on("chats.upsert", (chats: Chat[]) => {
       // Look for our target group in new chats (only if not already configured from env)
       for (const chat of chats) {
         if (
+          chat.id &&
           isJidGroup(chat.id) &&
           chat.name === this.targetGroupName &&
           !this.targetGroupId
@@ -405,7 +455,8 @@ export class WhatsAppClient {
       // Skip if message has no content
       if (!message.message) return;
 
-      const chatId = message.key.remoteJid!;
+      const chatId = message.key.remoteJid;
+      if (!chatId) return;
       const isGroup = isJidGroup(chatId);
 
       // Only process messages from:
@@ -443,20 +494,19 @@ export class WhatsAppClient {
 
         // Download the image
         try {
+          if (!this.socket) throw new Error("Socket not connected");
           const buffer = await downloadMediaMessage(
             message,
             "buffer",
             {},
             {
-              logger: console as any,
-              reuploadRequest: this.socket!.updateMediaMessage,
+              logger: pino({ level: "silent" }),
+              reuploadRequest: this.socket.updateMediaMessage,
             }
           );
           if (buffer) {
-            imageBase64 = (buffer as Buffer).toString("base64");
-            console.log(
-              `Downloaded image (${(buffer as Buffer).length} bytes)`
-            );
+            imageBase64 = buffer.toString("base64");
+            console.log(`Downloaded image (${buffer.length} bytes)`);
           }
         } catch (error) {
           console.error("Error downloading image:", error);
@@ -484,13 +534,13 @@ export class WhatsAppClient {
 
       // Get chat and contact information
       try {
-        if (isGroup) {
-          const groupMetadata = await this.socket!.groupMetadata(chatId);
+        if (isGroup && this.socket) {
+          const groupMetadata = await this.socket.groupMetadata(chatId);
           chatName = groupMetadata.subject || "Unknown Group";
 
           // Find the participant who sent the message
           const participant = groupMetadata.participants.find(
-            (p: any) =>
+            (p: GroupParticipant) =>
               jidNormalizedUser(p.id) ===
               jidNormalizedUser(message.key.participant || "")
           );

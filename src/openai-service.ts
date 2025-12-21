@@ -23,7 +23,7 @@ export interface MultiEventResult {
 
 export class OpenAIService {
   private openai: OpenAI;
-  private messageHistory: Map<string, string[]> = new Map();
+  private messageHistory = new Map<string, string[]>();
   private readonly MAX_HISTORY_LENGTH = 5;
   private readonly allowedChatNames: string[];
 
@@ -62,7 +62,8 @@ export class OpenAIService {
       this.messageHistory.set(chatId, []);
     }
 
-    const history = this.messageHistory.get(chatId)!;
+    const history = this.messageHistory.get(chatId);
+    if (!history) return;
     history.push(message);
 
     // Keep only the last MAX_HISTORY_LENGTH messages
@@ -178,13 +179,13 @@ For the startDateISO and endDateISO fields:
 `;
 
       // Build the message content array for the API call
-      const userContent: Array<
+      const userContent: (
         | { type: "text"; text: string }
         | {
             type: "image_url";
             image_url: { url: string; detail?: "low" | "high" | "auto" };
           }
-      > = [{ type: "text", text: prompt }];
+      )[] = [{ type: "text", text: prompt }];
 
       // Add image if present
       if (imageBase64 && imageMimeType) {
@@ -220,7 +221,19 @@ For the startDateISO and endDateISO fields:
 
       try {
         // Parse the JSON response
-        const parsedResponse = JSON.parse(content);
+        const parsedResponse = JSON.parse(content) as {
+          hasEvents?: boolean;
+          events?: {
+            summary?: string;
+            title?: string;
+            date?: string;
+            time?: string;
+            location?: string;
+            description?: string;
+            startDateISO?: string;
+            endDateISO?: string;
+          }[];
+        };
 
         const hasEvents = parsedResponse.hasEvents === true;
         const events: EventDetails[] = [];
@@ -229,14 +242,14 @@ For the startDateISO and endDateISO fields:
           for (const event of parsedResponse.events) {
             events.push({
               isEvent: true,
-              summary: event.summary || null,
-              title: event.title || null,
-              date: event.date || null,
-              time: event.time || null,
-              location: event.location || null,
-              description: event.description || null,
-              startDateISO: event.startDateISO || null,
-              endDateISO: event.endDateISO || null,
+              summary: event.summary ?? null,
+              title: event.title ?? null,
+              date: event.date ?? null,
+              time: event.time ?? null,
+              location: event.location ?? null,
+              description: event.description ?? null,
+              startDateISO: event.startDateISO ?? null,
+              endDateISO: event.endDateISO ?? null,
             });
           }
         }
@@ -253,7 +266,7 @@ For the startDateISO and endDateISO fields:
         const hasEvents =
           content.includes('"hasEvents": true') ||
           content.includes('"hasEvents":true');
-        const summaryMatch = content.match(/"summary":\s*"([^"]*)"/);
+        const summaryMatch = /"summary":\s*"([^"]*)"/.exec(content);
 
         if (hasEvents && summaryMatch) {
           return {
