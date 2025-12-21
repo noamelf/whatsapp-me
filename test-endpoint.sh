@@ -25,23 +25,21 @@ TEST_MESSAGE='שבוע טוב!
 יום רביעי 25/12 
 לא תתקיים פעולת ערב.'
 
-# Build headers
-HEADERS="-H \"Content-Type: application/json\""
-if [ -n "$TOKEN" ]; then
-  HEADERS="$HEADERS -H \"Authorization: Bearer $TOKEN\""
-  echo "Using authentication token"
-fi
+# Build curl command with proper JSON escaping
+JSON_PAYLOAD=$(jq -n --arg text "$TEST_MESSAGE" '{text: $text}')
 
-# Make the request
-eval curl -X POST \"$URL\" \
-  $HEADERS \
-  -d "$(cat <<EOF
-{
-  "text": "$TEST_MESSAGE"
-}
-EOF
-)" \
-  | jq '.'
+# Build headers
+if [ -n "$TOKEN" ]; then
+  echo "Using authentication token"
+  curl -X POST "$URL" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d "$JSON_PAYLOAD" | jq '.'
+else
+  curl -X POST "$URL" \
+    -H "Content-Type: application/json" \
+    -d "$JSON_PAYLOAD" | jq '.'
+fi
 
 echo ""
 echo "Test complete!"
