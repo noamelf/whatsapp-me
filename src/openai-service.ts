@@ -238,11 +238,20 @@ For the startDateISO and endDateISO fields:
           },
           { role: "user", content: userContent },
         ],
-        max_completion_tokens: 1500,
+        max_completion_tokens: 3000,
         response_format: { type: "json_object" },
       });
 
       const content = response.choices[0]?.message?.content || "";
+      const finishReason = response.choices[0]?.finish_reason;
+
+      // Check if response was truncated
+      if (finishReason === "length") {
+        console.error(
+          "⚠️ OpenAI response was truncated due to token limit. Increasing max_completion_tokens may help."
+        );
+        console.log("Partial response:", content);
+      }
 
       try {
         // Parse the JSON response
