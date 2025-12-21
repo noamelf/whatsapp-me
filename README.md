@@ -69,6 +69,18 @@ This application connects to WhatsApp using the Baileys library, listens for mes
    - When the bot finds your group, it will log the group ID in the console
    - Copy that ID and use it as `TARGET_GROUP_ID` for better performance
 
+   **Test Endpoint Security (Optional but Recommended):**
+
+   ```
+   # Generate a secure token for the /test-message endpoint
+   TEST_ENDPOINT_TOKEN=your_secure_token_here
+   ```
+
+   - Generate a secure token: `openssl rand -hex 32`
+   - If set, the `/test-message` endpoint requires authentication
+   - If not set, the endpoint is publicly accessible (not recommended for production)
+   - See [TEST_ENDPOINT.md](TEST_ENDPOINT.md) for usage examples
+
 4. (Optional) Add `ALLOWED_CHAT_NAMES` to your `.env` file to filter which chats are analyzed:
    ```
    ALLOWED_CHAT_NAMES=Family Group,Work Team,Book Club
@@ -106,6 +118,49 @@ This application connects to WhatsApp using the Baileys library, listens for mes
    ```
    npm run dev
    ```
+
+5. To test event detection without WhatsApp:
+   ```bash
+   # Set your token (from .env)
+   export TEST_TOKEN=7f42ab57ea7e98d7bd7784ca3aa48e3ebd168a8cd3ddc7c090f383a030b59067
+   
+   # Run the test script
+   ./test-endpoint.sh
+   
+   # Or test against production
+   ./test-endpoint.sh https://your-app.railway.app/test-message
+   ```
+   
+   See [TEST_ENDPOINT.md](TEST_ENDPOINT.md) for detailed API documentation.
+
+## Testing Event Detection
+
+The application includes a REST API endpoint for testing event detection without sending WhatsApp messages:
+
+- **Endpoint:** `POST /test-message`
+- **Port:** Same as health check (8080 in production, 3000 locally)
+- **Authentication:** Requires `TEST_ENDPOINT_TOKEN` (set in `.env`)
+- **Usage:**
+  ```bash
+  # Using curl with authentication
+  curl -X POST http://localhost:8080/test-message \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer YOUR_TOKEN" \
+    -d '{"text": "מחר בשעה 10:00 יש לנו פגישה בקפה נחלת בנימין"}'
+  
+  # Using the test script (easier)
+  TEST_TOKEN=your_token ./test-endpoint.sh
+  ```
+
+**Features:**
+- Test event detection without WhatsApp
+- Support for text and base64-encoded images
+- Returns structured JSON with detected events
+- Token-based security (401 without valid token)
+- Ideal for CI/CD integration and automated testing
+
+For complete documentation, examples in multiple languages, and security best practices, see [TEST_ENDPOINT.md](TEST_ENDPOINT.md).
+
 
 ## How It Works
 
