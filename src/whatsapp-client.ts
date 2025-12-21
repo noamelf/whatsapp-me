@@ -31,14 +31,17 @@ export class WhatsAppClient {
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 3;
   private readonly sessionDir = process.env.BAILEYS_AUTH_DIR || ".baileys_auth";
+  private readonly cacheFilePath: string;
   private openaiService: OpenAIService;
   private targetGroupName: string = "אני"; // Default target group name (can be overridden via TARGET_GROUP_NAME env var)
   private targetGroupId: string | null = null;
   private shouldReconnect: boolean = true;
   private connectionState: string = "close";
-  private groupCache = new NodeCache({ stdTTL: 5 * 60, useClones: false }); // 5 minute TTL
+  private groupCache = new NodeCache({ stdTTL: 30 * 60, useClones: false }); // 30 minute TTL
+  private cacheFlushInterval: NodeJS.Timeout | null = null;
 
   constructor() {
+    this.cacheFilePath = path.join(this.sessionDir, "group_cache.json");
     this.openaiService = new OpenAIService();
 
     // Configure target group from environment variables
@@ -46,6 +49,19 @@ export class WhatsAppClient {
 
     // Ensure session directory exists
     this.ensureSessionDir();
+
+    // Load persisted cache
+    this.loadCacheFromFile();
+
+    // Set up periodic cache saving (every 5 minutes)
+    this.cacheFlushInterval = setInterval(
+      () => this.saveCacheToFile(),
+      5 * 60 * 1000
+    );
+
+    // Save cache on process exit
+    process.on("SIGTERM", () => this.saveCacheToFile());
+    process.on("SIGINT", () => this.saveCacheToFile());
   }
 
   private configureTargetGroup(): void {
@@ -79,6 +95,120 @@ export class WhatsAppClient {
     if (!fs.existsSync(this.sessionDir)) {
       fs.mkdirSync(this.sessionDir, { recursive: true });
     }
+  }
+
+  /**
+   * Save group cache to file for persistence across restarts
+   */
+  private saveCacheToFile(): void {
+    try {
+      const keys = this.groupCache.keys();
+      const cacheData: Record<string, { data: any; savedAt: number }> = {};
+
+      for (const key of keys) {
+        const value = this.groupCache.get(key);
+        if (value) {
+          cacheData[key] = {
+            data: value,
+            savedAt: Date.now(),
+          };
+        }
+      }
+
+      if (Object.keys(cacheData).length > 0) {
+        fs.writeFileSync(
+          this.cacheFilePath,
+          JSON.stringify(cacheData, null, 2)
+        );
+        console.log(
+          `Saved ${Object.keys(cacheData).length} group(s) to cache file`
+        );
+      }
+    } catch (error) {
+      console.error("Error saving cache to file:", error);
+    }
+  }
+
+  /**
+   * Load group cache from file on startup
+   */
+  private loadCacheFromFile(): void {
+    try {
+      if (!fs.existsSync(this.cacheFilePath)) {
+        console.log("No cache file found, starting fresh");
+        return;
+      }
+
+      const data = fs.readFileSync(this.cacheFilePath, "utf-8");
+      const cacheData: Record<string, { data: any; savedAt: number }> =
+        JSON.parse(data);
+
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours max age for persisted cache
+      let loadedCount = 0;
+      let expiredCount = 0;
+
+      for (const [key, value] of Object.entries(cacheData)) {
+        // Only load if not too old
+        if (Date.now() - value.savedAt < maxAge) {
+          this.groupCache.set(key, value.data);
+          loadedCount++;
+        } else {
+          expiredCount++;
+        }
+      }
+
+      console.log(
+        `Loaded ${loadedCount} group(s) from cache file (${expiredCount} expired)`
+      );
+    } catch (error) {
+      console.error("Error loading cache from file:", error);
+    }
+  }
+
+  /**
+   * Fetch group metadata with rate limiting and exponential backoff
+   */
+  private async fetchGroupMetadataWithRetry(
+    groupId: string,
+    maxRetries: number = 3
+  ): Promise<any | null> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Check cache first
+        const cached = this.groupCache.get(groupId);
+        if (cached) {
+          return cached;
+        }
+
+        const metadata = await this.socket!.groupMetadata(groupId);
+        this.groupCache.set(groupId, metadata);
+        return metadata;
+      } catch (error: any) {
+        const isRateLimit =
+          error?.data === 429 || error?.message?.includes("rate-overlimit");
+
+        if (isRateLimit && attempt < maxRetries - 1) {
+          // Exponential backoff: 2s, 4s, 8s...
+          const delay = Math.pow(2, attempt + 1) * 1000;
+          console.log(
+            `Rate limited fetching group ${groupId}, retrying in ${
+              delay / 1000
+            }s... (attempt ${attempt + 1}/${maxRetries})`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        } else if (!isRateLimit) {
+          console.error(
+            `Error fetching group metadata for ${groupId}:`,
+            error.message || error
+          );
+          return null;
+        }
+      }
+    }
+    console.warn(
+      `Failed to fetch group metadata for ${groupId} after ${maxRetries} attempts (rate limited)`
+    );
+    return null;
   }
 
   private async createSocket(): Promise<void> {
@@ -214,18 +344,13 @@ export class WhatsAppClient {
 
     // Handle group updates
     this.socket.ev.on("groups.update", async (updates: any[]) => {
+      // Process updates with a small delay between each to avoid rate limiting
       for (const update of updates) {
-        // Update group metadata cache
-        try {
-          const metadata = await this.socket!.groupMetadata(update.id);
-          this.groupCache.set(update.id, metadata);
+        // Update group metadata cache with rate limiting
+        const metadata = await this.fetchGroupMetadataWithRetry(update.id);
+        if (metadata) {
           console.log(
             `Updated group metadata cache for: ${metadata.subject || update.id}`
-          );
-        } catch (error) {
-          console.error(
-            `Failed to update group metadata cache for ${update.id}:`,
-            error
           );
         }
 
@@ -238,24 +363,21 @@ export class WhatsAppClient {
             );
           }
         }
+
+        // Small delay between processing updates to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     });
 
     // Handle group participants update
     this.socket.ev.on("group-participants.update", async (event: any) => {
-      // Update group metadata cache when participants change
-      try {
-        const metadata = await this.socket!.groupMetadata(event.id);
-        this.groupCache.set(event.id, metadata);
+      // Update group metadata cache when participants change with rate limiting
+      const metadata = await this.fetchGroupMetadataWithRetry(event.id);
+      if (metadata) {
         console.log(
           `Updated group metadata cache for participant change in: ${
             metadata.subject || event.id
           }`
-        );
-      } catch (error) {
-        console.error(
-          `Failed to update group metadata cache for participant change in ${event.id}:`,
-          error
         );
       }
     });
