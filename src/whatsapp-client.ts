@@ -13,6 +13,7 @@ import { Boom } from "@hapi/boom";
 import * as fs from "fs";
 import * as path from "path";
 import * as qrcode from "qrcode-terminal";
+import * as QRCode from "qrcode";
 import NodeCache from "node-cache";
 import {
   OpenAIService,
@@ -127,15 +128,21 @@ export class WhatsAppClient {
         );
         // Generate terminal QR code
         qrcode.generate(qr, { small: true });
-        // Also provide a URL to view the QR code in a browser (useful for Railway logs)
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
-          qr
-        )}`;
-        console.log(
-          "\n📱 Can't see the QR code? Open this URL in your browser:"
-        );
-        console.log(qrUrl);
-        console.log("");
+
+        // Generate a secure data URL that can be opened locally in a browser
+        // This is secure because the QR data never leaves your machine
+        try {
+          const qrDataUrl = await QRCode.toDataURL(qr, { width: 300 });
+          console.log(
+            "\n📱 Can't see the QR code? Copy and paste this URL into your browser:"
+          );
+          console.log(qrDataUrl);
+          console.log("");
+        } catch (err) {
+          console.log(
+            "\n📱 Can't see the QR code? Try adjusting your terminal size."
+          );
+        }
       }
 
       if (connection === "close") {
