@@ -1,14 +1,18 @@
 import * as http from "http";
 
 interface HealthStatus {
-  status: "healthy" | "unhealthy";
+  status: "healthy" | "unhealthy" | "initializing";
   whatsappConnected: boolean;
   connectionState: string;
   uptime: number;
   timestamp: string;
 }
 
-type StatusProvider = () => { isConnected: boolean; connectionState: string };
+type StatusProvider = () => {
+  isConnected: boolean;
+  connectionState: string;
+  hasEverConnected: boolean;
+};
 
 export class HealthServer {
   private server: http.Server | null = null;
@@ -25,9 +29,9 @@ export class HealthServer {
       // Only respond to GET /health or GET /
       if (req.method === "GET" && (req.url === "/health" || req.url === "/")) {
         const status = this.getHealthStatus();
-        // Always return 200 so Railway doesn't kill the process during QR code scanning
-        // The status field indicates the actual WhatsApp connection state
-        res.writeHead(200, { "Content-Type": "application/json" });
+        // Return 200 during setup (before first connection), 503 if disconnected after setup
+        const statusCode = status.status === "unhealthy" ? 503 : 200;
+        res.writeHead(statusCode, { "Content-Type": "application/json" });
         res.end(JSON.stringify(status, null, 2));
       } else {
         res.writeHead(404, { "Content-Type": "application/json" });
@@ -46,11 +50,25 @@ export class HealthServer {
   }
 
   private getHealthStatus(): HealthStatus {
-    const { isConnected, connectionState } = this.statusProvider();
+    const { isConnected, connectionState, hasEverConnected } =
+      this.statusProvider();
     const uptimeMs = Date.now() - this.startTime.getTime();
 
+    // Determine status:
+    // - "initializing" = never connected yet (waiting for QR scan) -> 200
+    // - "healthy" = currently connected -> 200
+    // - "unhealthy" = was connected but now disconnected -> 503
+    let status: "healthy" | "unhealthy" | "initializing";
+    if (isConnected) {
+      status = "healthy";
+    } else if (hasEverConnected) {
+      status = "unhealthy";
+    } else {
+      status = "initializing";
+    }
+
     return {
-      status: isConnected ? "healthy" : "unhealthy",
+      status,
       whatsappConnected: isConnected,
       connectionState,
       uptime: Math.floor(uptimeMs / 1000),

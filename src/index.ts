@@ -53,6 +53,7 @@ async function main() {
       const healthServer = new HealthServer(() => ({
         isConnected: whatsappClient.isConnected(),
         connectionState: whatsappClient.getConnectionState(),
+        hasEverConnected: whatsappClient.getHasEverConnected(),
       }));
       healthServer.start(healthPort);
 

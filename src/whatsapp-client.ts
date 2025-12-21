@@ -26,6 +26,7 @@ type WASocketType = ReturnType<typeof makeWASocket>;
 export class WhatsAppClient {
   private socket: WASocketType | null = null;
   private isReady: boolean = false;
+  private hasEverConnected: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 3;
   private readonly sessionDir = process.env.BAILEYS_AUTH_DIR || ".baileys_auth";
@@ -184,6 +185,7 @@ export class WhatsAppClient {
       } else if (connection === "open") {
         this.connectionState = "open";
         this.isReady = true;
+        this.hasEverConnected = true;
         this.reconnectAttempts = 0;
         console.log("WhatsApp connection opened successfully!");
 
@@ -623,7 +625,9 @@ export class WhatsAppClient {
         attempts++;
 
         if (attempts % 30 === 0) {
-          console.log(`Waiting for WhatsApp connection... (${attempts}s) - Please scan the QR code above`);
+          console.log(
+            `Waiting for WhatsApp connection... (${attempts}s) - Please scan the QR code above`
+          );
         }
       }
 
@@ -673,6 +677,10 @@ export class WhatsAppClient {
 
   public isConnected(): boolean {
     return this.isReady && this.connectionState === "open";
+  }
+
+  public getHasEverConnected(): boolean {
+    return this.hasEverConnected;
   }
 
   public getConnectionState(): string {
