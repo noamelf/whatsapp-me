@@ -48,13 +48,25 @@ async function main() {
       // Start listening for incoming messages
       whatsappClient.startListeningForMessages();
 
-      // Start health check server
+      // Start health check server with test message handler
       const healthPort = parseInt(process.env.PORT || "3000", 10);
-      const healthServer = new HealthServer(() => ({
-        isConnected: whatsappClient.isConnected(),
-        connectionState: whatsappClient.getConnectionState(),
-        hasEverConnected: whatsappClient.getHasEverConnected(),
-      }));
+      const testEndpointToken = process.env.TEST_ENDPOINT_TOKEN;
+      const healthServer = new HealthServer(
+        () => ({
+          isConnected: whatsappClient.isConnected(),
+          connectionState: whatsappClient.getConnectionState(),
+          hasEverConnected: whatsappClient.getHasEverConnected(),
+        }),
+        // Message handler for test endpoint
+        async (text, imageBase64, imageMimeType) => {
+          return await whatsappClient.testMessage(
+            text,
+            imageBase64,
+            imageMimeType
+          );
+        },
+        testEndpointToken
+      );
       healthServer.start(healthPort);
 
       // Keep the application running until user terminates it

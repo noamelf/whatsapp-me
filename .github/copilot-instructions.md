@@ -113,6 +113,19 @@ Events extracted must conform to:
 - **Session Management**: Persist WhatsApp sessions to `auth_info` directory
 - **Async/Await**: Use async patterns for WhatsApp message listeners and API calls
 - **Type Safety**: Use TypeScript interfaces for event data and API responses
+- **Linting**: Always run `npm run lint` before committing to catch type errors and code quality issues
+
+### Code Quality
+
+- Run `npm run lint` before every commit to ensure code quality
+- Fix all linter errors - the build will fail in CI if linting fails
+- Use `npm run lint:fix` to automatically fix fixable issues
+- Follow ESLint rules configured in `eslint.config.mjs`:
+  - No unused variables
+  - No floating promises (always await or handle with `.catch()`)
+  - No unsafe `any` usage
+  - No unreachable code
+  - Prefer `T[]` over `Array<T>` for array types
 
 ### Testing
 

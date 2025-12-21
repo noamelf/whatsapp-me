@@ -903,4 +903,51 @@ export class WhatsAppClient {
   public getTargetGroupName(): string {
     return this.targetGroupName;
   }
+
+  /**
+   * Test message processing without WhatsApp (for HTTP endpoint)
+   */
+  public async testMessage(
+    text: string,
+    imageBase64: string | null = null,
+    imageMimeType: string | null = null
+  ): Promise<{
+    hasEvents: boolean;
+    events: EventDetails[];
+  }> {
+    console.log(
+      `\n[TEST MODE] Analyzing message: ${text.substring(0, 100)}...`
+    );
+
+    // Analyze the message with OpenAI
+    const analysis = await this.openaiService.analyzeMessage(
+      "test-chat-id",
+      text,
+      "Test Chat",
+      "Test User",
+      imageBase64,
+      imageMimeType
+    );
+
+    if (analysis.hasEvents && analysis.events.length > 0) {
+      console.log(`[TEST MODE] ${analysis.events.length} event(s) detected!`);
+      for (const event of analysis.events) {
+        if (event.isEvent && event.summary) {
+          console.log(`[TEST MODE] Event: ${event.summary}`);
+          console.log(`[TEST MODE] Details:`, {
+            title: event.title,
+            date: event.date,
+            time: event.time,
+            location: event.location,
+            startDateISO: event.startDateISO,
+            endDateISO: event.endDateISO,
+          });
+        }
+      }
+    } else {
+      console.log("[TEST MODE] No events detected");
+    }
+
+    return analysis;
+  }
 }
