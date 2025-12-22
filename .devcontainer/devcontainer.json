@@ -1,13 +1,14 @@
 {
   "name": "WhatsApp Me",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1",
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/meaningful-ooo/devcontainer-features/fish:1": {}
   },
   "mounts": [
     "source=whatsapp-me-railway-config,target=/home/node/.railway,type=volume",
-    "source=${localEnv:HOME}/Library/Preferences/@checkly,target=/home/node/.config/@checkly,type=bind"
+    "source=whatsapp-me-checkly-config,target=/home/node/.checkly,type=volume"
   ],
   "customizations": {
     "vscode": {
@@ -17,16 +18,15 @@
         "ms-azuretools.vscode-docker"
       ],
       "settings": {
-        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.defaultProfile.linux": "fish",
         "editor.formatOnSave": true,
         "typescript.preferences.importModuleSpecifier": "relative",
         "mcp": {
           "servers": {
             "railway": {
-              "command": "npx",
+              "command": "railway",
               "args": [
-                "-y",
-                "@railway/mcp-server"
+                "mcp"
               ]
             }
           }

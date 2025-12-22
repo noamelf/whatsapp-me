@@ -765,7 +765,10 @@ export class WhatsAppClient {
             },
           });
         } catch (error) {
-          console.error("Failed to send event message, sending text only:", error);
+          console.error(
+            "Failed to send event message, sending text only:",
+            error
+          );
           // Fallback to text message if event message fails
           const textMessage = this.formatEventMessage(
             eventDetails,
