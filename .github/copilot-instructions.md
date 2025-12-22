@@ -40,6 +40,7 @@ WhatsApp Event Detection System: A service that monitors WhatsApp conversations,
 - **Multi-Language Support**: Process event discussions in English and Hebrew
 - **Multiple Events**: Extract multiple events from single messages
 - **Context Awareness**: Understand conversation history and context
+- **Group Context**: Pass the group/chat name to OpenAI for better event detection accuracy and context understanding
 - **Smart Date Parsing**: Handle relative dates (tomorrow, next Monday), absolute dates, and Hebrew date expressions
 - **Event Extraction**: Pull title, date, time, location, description from natural conversations
 - **False Positive Prevention**: Distinguish between event planning and casual conversation
@@ -100,6 +101,7 @@ Events extracted must conform to:
 ### Prompting Rules
 
 - Provide Hebrew outputs (`summary`, `title`, `location`, descriptions) when content is Hebrew
+- Include group/chat name in prompts for better context understanding (helps AI determine conversation purpose and reduce false positives)
 - Request `startDateISO` and `endDateISO` in ISO 8601 format for calendar compatibility
 - Keep `description` field concise; don't repeat raw message text
 - Explicitly ask for `isEvent` classification to minimize false positives
