@@ -656,7 +656,8 @@ export class WhatsAppClient {
     chatName: string,
     contactName: string,
     imageBase64: string | null = null,
-    imageMimeType: string | null = null
+    imageMimeType: string | null = null,
+    sendToWhatsApp = true
   ): Promise<{
     hasEvents: boolean;
     events: EventDetails[];
@@ -694,21 +695,20 @@ export class WhatsAppClient {
             endDateISO: event.endDateISO,
           });
 
-          // If we found the target group, send the event details
-          if (this.targetGroupId) {
-            // Send the combined event message (details + calendar attachment)
-            if (event.title && event.startDateISO) {
+          // Format the message for response
+          if (event.title && event.startDateISO) {
+            const formattedMessage = this.formatEventMessage(event, chatName);
+            formattedMessages.push(formattedMessage);
+
+            // Only send to WhatsApp if requested (not for test endpoint)
+            if (sendToWhatsApp && this.targetGroupId) {
               await this.sendEventToGroup(this.targetGroupId, event, chatName);
               console.log(`Event sent to "${this.targetGroupName}" group`);
-
-              // Format the message for test endpoint response
-              const formattedMessage = this.formatEventMessage(event, chatName);
-              formattedMessages.push(formattedMessage);
+            } else if (sendToWhatsApp && !this.targetGroupId) {
+              console.log(
+                `Target group "${this.targetGroupName}" not found. Event not sent.`
+              );
             }
-          } else {
-            console.log(
-              `Target group "${this.targetGroupName}" not found. Event not sent.`
-            );
           }
         }
       }
@@ -974,14 +974,15 @@ export class WhatsAppClient {
       )}...`
     );
 
-    // Use the same processing logic as real messages
+    // Use the same processing logic as real messages, but don't send to WhatsApp
     return await this.processMessageForEvents(
       "test-chat-id",
       text,
       chatName,
       "Test User",
       imageBase64,
-      imageMimeType
+      imageMimeType,
+      false // Don't send to WhatsApp for test endpoint
     );
   }
 }
