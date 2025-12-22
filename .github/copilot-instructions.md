@@ -133,6 +133,14 @@ Events extracted must conform to:
 
 - **Local Testing**: Use `test-message.ts` for testing event detection without live WhatsApp connection
 - **End-to-End Testing**: Use Checkly to test the deployed endpoint with `npm run checkly:test`
+- **Manual API Testing**: Test the Railway deployment directly with curl:
+  ```bash
+  curl -X POST https://whatsapp-me-production-1204.up.railway.app/test-message \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TEST_ENDPOINT_TOKEN" \
+    -d '{"text": "מחר בשעה 10:00 יש לנו פגישה בקפה נחלת בנימין"}'
+  ```
+  This returns the JSON response with detected events from the OpenAI analysis
 - **Test Coverage**: Test with both English and Hebrew content
 - **Multi-Event Testing**: Verify multi-event extraction with complex messages
 - **Date Parsing**: Test relative date parsing (tomorrow, next week, etc.)
@@ -141,7 +149,7 @@ Events extracted must conform to:
 ### Deployment Workflow
 
 - **Automatic Deployment**: Railway automatically deploys when changes are pushed to the `main` branch on GitHub
-- **Deployment Process**: 
+- **Deployment Process**:
   1. Commit changes: `git add -A && git commit -m "your message"`
   2. Push to GitHub: `git push origin main`
   3. Railway automatically detects the push and starts deployment
