@@ -131,18 +131,34 @@ Events extracted must conform to:
 
 ### Testing
 
-- Use `test-message.ts` for testing event detection without live WhatsApp connection
-- Test with both English and Hebrew content
-- Verify multi-event extraction with complex messages
-- Test relative date parsing (tomorrow, next week, etc.)
+- **Local Testing**: Use `test-message.ts` for testing event detection without live WhatsApp connection
+- **End-to-End Testing**: Use Checkly to test the deployed endpoint with `npm run checkly:test`
+- **Test Coverage**: Test with both English and Hebrew content
+- **Multi-Event Testing**: Verify multi-event extraction with complex messages
+- **Date Parsing**: Test relative date parsing (tomorrow, next week, etc.)
+- **Deployment Verification**: After pushing changes, run Checkly tests to verify the deployment is working
+
+### Deployment Workflow
+
+- **Automatic Deployment**: Railway automatically deploys when changes are pushed to the `main` branch on GitHub
+- **Deployment Process**: 
+  1. Commit changes: `git add -A && git commit -m "your message"`
+  2. Push to GitHub: `git push origin main`
+  3. Railway automatically detects the push and starts deployment
+  4. Wait for deployment to complete (typically 1-2 minutes)
+  5. Verify with Checkly: `npm run checkly:test`
+- **Health Check**: Railway uses `/health` endpoint for deployment health checks (configured in railway.toml)
+- **Environment Variables**: Set in Railway dashboard (OPENAI_API_KEY, TEST_ENDPOINT_TOKEN, etc.)
+- **Session Persistence**: WhatsApp sessions are stored in Railway volume mount at `/app/.baileys_auth`
 
 ### Deployment Considerations
 
 - Health check endpoint on configurable port (default 3000)
 - Automatic reconnection handling for WhatsApp
-- Environment-based configuration (.env file)
+- Environment-based configuration (.env file for local, Railway dashboard for production)
 - Docker support with proper signal handling for graceful shutdown
 - Railway.toml configuration for deployment pipeline
+- Volume mount for persistent WhatsApp authentication sessions
 
 ## Common Implementation Tasks
 
