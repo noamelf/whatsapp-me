@@ -16,6 +16,7 @@ type StatusProvider = () => {
 
 type MessageHandler = (
   text: string,
+  chatName?: string,
   imageBase64?: string | null,
   imageMimeType?: string | null
 ) => Promise<{
@@ -31,6 +32,7 @@ type MessageHandler = (
     startDateISO: string | null;
     endDateISO: string | null;
   }[];
+  formattedMessages?: string[];
 }>;
 
 export class HealthServer {
@@ -122,6 +124,7 @@ export class HealthServer {
       try {
         const payload = JSON.parse(body) as {
           text: string;
+          chatName?: string;
           imageBase64?: string;
           imageMimeType?: string;
         };
@@ -139,7 +142,9 @@ export class HealthServer {
         }
 
         console.log(
-          `\n[TEST MESSAGE] Received: ${payload.text.substring(0, 100)}...`
+          `\n[TEST MESSAGE] Received from "${
+            payload.chatName || "Test Chat"
+          }": ${payload.text.substring(0, 100)}...`
         );
 
         if (!this.messageHandler) {
@@ -152,6 +157,7 @@ export class HealthServer {
 
         const result = await this.messageHandler(
           payload.text,
+          payload.chatName,
           payload.imageBase64 || null,
           payload.imageMimeType || null
         );

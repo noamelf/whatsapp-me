@@ -58,9 +58,10 @@ async function main() {
           hasEverConnected: whatsappClient.getHasEverConnected(),
         }),
         // Message handler for test endpoint
-        async (text, imageBase64, imageMimeType) => {
+        async (text, chatName, imageBase64, imageMimeType) => {
           return await whatsappClient.testMessage(
             text,
+            chatName,
             imageBase64,
             imageMimeType
           );

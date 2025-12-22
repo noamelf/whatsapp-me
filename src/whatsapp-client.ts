@@ -562,12 +562,8 @@ export class WhatsAppClient {
       // Add message to history for this chat
       this.openaiService.addMessageToHistory(chatId, messageText);
 
-      // Analyze the message for events
-      console.log(
-        `Analyzing message for events...${imageBase64 ? " (with image)" : ""}`
-      );
-
-      const analysis = await this.openaiService.analyzeMessage(
+      // Process the message (shared logic with test endpoint)
+      await this.processMessageForEvents(
         chatId,
         messageText,
         chatName,
@@ -575,38 +571,6 @@ export class WhatsAppClient {
         imageBase64,
         imageMimeType
       );
-
-      if (analysis.hasEvents && analysis.events.length > 0) {
-        console.log(`${analysis.events.length} event(s) detected!`);
-
-        for (const event of analysis.events) {
-          if (event.isEvent && event.summary) {
-            console.log(`Event detected! Summary: ${event.summary}`);
-            console.log(`Event details:`, {
-              title: event.title,
-              date: event.date,
-              time: event.time,
-              location: event.location,
-              description: event.description,
-              startDateISO: event.startDateISO,
-              endDateISO: event.endDateISO,
-            });
-
-            // If we found the target group, send the event details
-            if (this.targetGroupId) {
-              // Send the combined event message (details + calendar attachment)
-              if (event.title && event.startDateISO) {
-                await this.sendEventToGroup(this.targetGroupId, event, chatName);
-                console.log(`Event sent to "${this.targetGroupName}" group`);
-              }
-            } else {
-              console.log(
-                `Target group "${this.targetGroupName}" not found. Event not sent.`
-              );
-            }
-          }
-        }
-      }
     } catch (error) {
       console.error("Error handling incoming message:", error);
     }
@@ -683,6 +647,81 @@ export class WhatsAppClient {
     }
   }
 
+  /**
+   * Process a message for event detection (shared by real messages and test endpoint)
+   */
+  private async processMessageForEvents(
+    chatId: string,
+    messageText: string,
+    chatName: string,
+    contactName: string,
+    imageBase64: string | null = null,
+    imageMimeType: string | null = null
+  ): Promise<{
+    hasEvents: boolean;
+    events: EventDetails[];
+    formattedMessages?: string[];
+  }> {
+    // Analyze the message for events
+    console.log(
+      `Analyzing message for events...${imageBase64 ? " (with image)" : ""}`
+    );
+
+    const analysis = await this.openaiService.analyzeMessage(
+      chatId,
+      messageText,
+      chatName,
+      contactName,
+      imageBase64,
+      imageMimeType
+    );
+
+    const formattedMessages: string[] = [];
+
+    if (analysis.hasEvents && analysis.events.length > 0) {
+      console.log(`${analysis.events.length} event(s) detected!`);
+
+      for (const event of analysis.events) {
+        if (event.isEvent && event.summary) {
+          console.log(`Event detected! Summary: ${event.summary}`);
+          console.log(`Event details:`, {
+            title: event.title,
+            date: event.date,
+            time: event.time,
+            location: event.location,
+            description: event.description,
+            startDateISO: event.startDateISO,
+            endDateISO: event.endDateISO,
+          });
+
+          // If we found the target group, send the event details
+          if (this.targetGroupId) {
+            // Send the combined event message (details + calendar attachment)
+            if (event.title && event.startDateISO) {
+              await this.sendEventToGroup(this.targetGroupId, event, chatName);
+              console.log(`Event sent to "${this.targetGroupName}" group`);
+
+              // Format the message for test endpoint response
+              const formattedMessage = this.formatEventMessage(event, chatName);
+              formattedMessages.push(formattedMessage);
+            }
+          } else {
+            console.log(
+              `Target group "${this.targetGroupName}" not found. Event not sent.`
+            );
+          }
+        }
+      }
+    }
+
+    return {
+      hasEvents: analysis.hasEvents,
+      events: analysis.events,
+      formattedMessages:
+        formattedMessages.length > 0 ? formattedMessages : undefined,
+    };
+  }
+
   private async sendEventToGroup(
     groupId: string,
     eventDetails: EventDetails,
@@ -695,7 +734,10 @@ export class WhatsAppClient {
 
     try {
       // Create a detailed event message
-      const eventMessage = this.formatEventMessage(eventDetails, sourceGroupName);
+      const eventMessage = this.formatEventMessage(
+        eventDetails,
+        sourceGroupName
+      );
 
       // Try to send as calendar event attachment with the event details as caption
       if (
@@ -737,7 +779,10 @@ export class WhatsAppClient {
     }
   }
 
-  private formatEventMessage(eventDetails: EventDetails, sourceGroupName?: string): string {
+  private formatEventMessage(
+    eventDetails: EventDetails,
+    sourceGroupName?: string
+  ): string {
     let eventMessage = `📅 *${eventDetails.title || "אירוע"}*\n\n`;
 
     if (sourceGroupName) {
@@ -914,45 +959,29 @@ export class WhatsAppClient {
    */
   public async testMessage(
     text: string,
+    chatName = "Test Chat",
     imageBase64: string | null = null,
     imageMimeType: string | null = null
   ): Promise<{
     hasEvents: boolean;
     events: EventDetails[];
+    formattedMessages?: string[];
   }> {
     console.log(
-      `\n[TEST MODE] Analyzing message: ${text.substring(0, 100)}...`
+      `\n[TEST MODE] Analyzing message from "${chatName}": ${text.substring(
+        0,
+        100
+      )}...`
     );
 
-    // Analyze the message with OpenAI
-    const analysis = await this.openaiService.analyzeMessage(
+    // Use the same processing logic as real messages
+    return await this.processMessageForEvents(
       "test-chat-id",
       text,
-      "Test Chat",
+      chatName,
       "Test User",
       imageBase64,
       imageMimeType
     );
-
-    if (analysis.hasEvents && analysis.events.length > 0) {
-      console.log(`[TEST MODE] ${analysis.events.length} event(s) detected!`);
-      for (const event of analysis.events) {
-        if (event.isEvent && event.summary) {
-          console.log(`[TEST MODE] Event: ${event.summary}`);
-          console.log(`[TEST MODE] Details:`, {
-            title: event.title,
-            date: event.date,
-            time: event.time,
-            location: event.location,
-            startDateISO: event.startDateISO,
-            endDateISO: event.endDateISO,
-          });
-        }
-      }
-    } else {
-      console.log("[TEST MODE] No events detected");
-    }
-
-    return analysis;
   }
 }
