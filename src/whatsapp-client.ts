@@ -733,46 +733,53 @@ export class WhatsAppClient {
     }
 
     try {
-      // Create a detailed event message
-      const eventMessage = this.formatEventMessage(
-        eventDetails,
-        sourceGroupName
-      );
-
-      // Try to send as calendar event attachment with the event details as caption
+      // Send as WhatsApp native event message
       if (
         eventDetails.title &&
         eventDetails.startDateISO &&
         eventDetails.endDateISO
       ) {
         try {
-          const vCalendarContent = this.createEventVCalendar(eventDetails);
-          const filename = `${eventDetails.title.replace(
-            /[^a-zA-Z0-9א-ת]/g,
-            "_"
-          )}_${Date.now()}.ics`;
+          const startDate = new Date(eventDetails.startDateISO);
+          const endDate = new Date(eventDetails.endDateISO);
 
-          // Create a buffer from the VCalendar content
-          const buffer = Buffer.from(vCalendarContent, "utf-8");
+          // Build event description with source group info
+          let eventDescription = eventDetails.description || "";
+          if (sourceGroupName) {
+            eventDescription = `מקור: ${sourceGroupName}\n\n${eventDescription}`;
+          }
 
-          // Send as document attachment with event details as caption
           await this.socket.sendMessage(groupId, {
-            document: buffer,
-            fileName: filename,
-            mimetype: "text/calendar",
-            caption: eventMessage,
+            event: {
+              name: eventDetails.title,
+              description: eventDescription.trim() || undefined,
+              startDate: startDate,
+              endDate: endDate,
+              location: eventDetails.location
+                ? {
+                    degreesLatitude: 0,
+                    degreesLongitude: 0,
+                    name: eventDetails.location,
+                  }
+                : undefined,
+            },
           });
         } catch (error) {
-          console.error(
-            "Failed to send calendar attachment, sending text only:",
-            error
+          console.error("Failed to send event message, sending text only:", error);
+          // Fallback to text message if event message fails
+          const textMessage = this.formatEventMessage(
+            eventDetails,
+            sourceGroupName
           );
-          // Fallback to text only if attachment fails
-          await this.socket.sendMessage(groupId, { text: eventMessage });
+          await this.socket.sendMessage(groupId, { text: textMessage });
         }
       } else {
         // If no complete event details, just send the text message
-        await this.socket.sendMessage(groupId, { text: eventMessage });
+        const textMessage = this.formatEventMessage(
+          eventDetails,
+          sourceGroupName
+        );
+        await this.socket.sendMessage(groupId, { text: textMessage });
       }
     } catch (error) {
       console.error("Error sending event to group:", error);
@@ -824,53 +831,6 @@ export class WhatsAppClient {
     }
 
     return eventMessage;
-  }
-
-  private createEventVCalendar(eventDetails: EventDetails): string {
-    const now = new Date();
-    const dtstamp = now.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-    const uid = `event-${Date.now()}@whatsapp-bot`;
-
-    let vcalendar = "BEGIN:VCALENDAR\n";
-    vcalendar += "VERSION:2.0\n";
-    vcalendar += "PRODID:-//WhatsApp Event Bot//EN\n";
-    vcalendar += "BEGIN:VEVENT\n";
-    vcalendar += `UID:${uid}\n`;
-    vcalendar += `DTSTAMP:${dtstamp}\n`;
-
-    if (eventDetails.startDateISO) {
-      const startDate = new Date(eventDetails.startDateISO);
-      const dtstart =
-        startDate.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-      vcalendar += `DTSTART:${dtstart}\n`;
-    }
-
-    if (eventDetails.endDateISO) {
-      const endDate = new Date(eventDetails.endDateISO);
-      const dtend =
-        endDate.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-      vcalendar += `DTEND:${dtend}\n`;
-    }
-
-    if (eventDetails.title) {
-      vcalendar += `SUMMARY:${eventDetails.title.replace(/\n/g, "\\n")}\n`;
-    }
-
-    if (eventDetails.description) {
-      vcalendar += `DESCRIPTION:${eventDetails.description.replace(
-        /\n/g,
-        "\\n"
-      )}\n`;
-    }
-
-    if (eventDetails.location) {
-      vcalendar += `LOCATION:${eventDetails.location.replace(/\n/g, "\\n")}\n`;
-    }
-
-    vcalendar += "END:VEVENT\n";
-    vcalendar += "END:VCALENDAR";
-
-    return vcalendar;
   }
 
   public async initialize(): Promise<void> {
