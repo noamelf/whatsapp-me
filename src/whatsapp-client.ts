@@ -596,7 +596,7 @@ export class WhatsAppClient {
             if (this.targetGroupId) {
               // Send the combined event message (details + calendar attachment)
               if (event.title && event.startDateISO) {
-                await this.sendEventToGroup(this.targetGroupId, event);
+                await this.sendEventToGroup(this.targetGroupId, event, chatName);
                 console.log(`Event sent to "${this.targetGroupName}" group`);
               }
             } else {
@@ -685,7 +685,8 @@ export class WhatsAppClient {
 
   private async sendEventToGroup(
     groupId: string,
-    eventDetails: EventDetails
+    eventDetails: EventDetails,
+    sourceGroupName?: string
   ): Promise<void> {
     if (!this.socket || !this.isReady) {
       console.error("WhatsApp socket not ready");
@@ -694,7 +695,7 @@ export class WhatsAppClient {
 
     try {
       // Create a detailed event message
-      const eventMessage = this.formatEventMessage(eventDetails);
+      const eventMessage = this.formatEventMessage(eventDetails, sourceGroupName);
 
       // Try to send as calendar event attachment with the event details as caption
       if (
@@ -736,8 +737,12 @@ export class WhatsAppClient {
     }
   }
 
-  private formatEventMessage(eventDetails: EventDetails): string {
+  private formatEventMessage(eventDetails: EventDetails, sourceGroupName?: string): string {
     let eventMessage = `📅 *${eventDetails.title || "אירוע"}*\n\n`;
+
+    if (sourceGroupName) {
+      eventMessage += `📱 מקור: ${sourceGroupName}\n\n`;
+    }
 
     if (eventDetails.description) {
       eventMessage += `${eventDetails.description}\n\n`;
