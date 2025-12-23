@@ -51,16 +51,33 @@ export class OpenAIService {
   private messageHistory = new Map<string, string[]>();
   private readonly MAX_HISTORY_LENGTH = 5;
   private readonly allowedChatNames: string[];
+  private readonly model: string;
 
   constructor() {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new Error("OPENAI_API_KEY is not defined in .env file");
+    // Support both OpenRouter and direct OpenAI
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+    
+    if (!openRouterKey && !openaiKey) {
+      throw new Error("Either OPENROUTER_API_KEY or OPENAI_API_KEY must be defined in .env file");
     }
 
-    this.openai = new OpenAI({
-      apiKey: apiKey,
-    });
+    // Prefer OpenRouter if key is provided
+    if (openRouterKey) {
+      this.openai = new OpenAI({
+        apiKey: openRouterKey,
+        baseURL: "https://openrouter.ai/api/v1",
+      });
+      // Default to cost-effective model via OpenRouter
+      this.model = process.env.LLM_MODEL || "google/gemini-2.0-flash-lite-001";
+      console.log(`Using OpenRouter with model: ${this.model}`);
+    } else {
+      this.openai = new OpenAI({
+        apiKey: openaiKey,
+      });
+      this.model = process.env.LLM_MODEL || "gpt-5-mini";
+      console.log(`Using OpenAI directly with model: ${this.model}`);
+    }
 
     // Get allowed chat names from environment variable
     const allowedChatNamesStr = process.env.ALLOWED_CHAT_NAMES;
@@ -232,9 +249,9 @@ For the startDateISO and endDateISO fields:
         console.log("Including image in OpenAI analysis request");
       }
 
-      // Call OpenAI API
+      // Call OpenAI API (via OpenRouter or directly)
       const response = await this.openai.chat.completions.create({
-        model: "gpt-5-mini",
+        model: this.model,
         messages: [
           {
             role: "system",

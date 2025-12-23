@@ -25,10 +25,35 @@ describe("Configuration and Edge Cases", () => {
     return client;
   };
 
+  // Ensure API key is set for tests that need it
+  const originalOpenAIKey = process.env.OPENAI_API_KEY;
+  const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
+
+  beforeAll(() => {
+    // Set a test API key if not already set
+    if (!process.env.OPENAI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+      process.env.OPENAI_API_KEY = "test-api-key";
+    }
+  });
+
+  afterAll(() => {
+    // Restore original keys
+    if (originalOpenAIKey) {
+      process.env.OPENAI_API_KEY = originalOpenAIKey;
+    }
+    if (originalOpenRouterKey) {
+      process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
+    }
+  });
+
   beforeEach(() => {
     cleanupTestAuthDir();
     jest.clearAllMocks();
     clients.length = 0;
+    // Ensure API key is set for each test
+    if (!process.env.OPENAI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+      process.env.OPENAI_API_KEY = "test-api-key";
+    }
   });
 
   afterEach(async () => {
@@ -38,19 +63,23 @@ describe("Configuration and Edge Cases", () => {
   });
 
   describe("Environment Variable Configuration", () => {
-    it("should require OPENAI_API_KEY", () => {
-      const originalKey = process.env.OPENAI_API_KEY;
+    it("should require either OPENROUTER_API_KEY or OPENAI_API_KEY", () => {
+      const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
+      const originalOpenAIKey = process.env.OPENAI_API_KEY;
+      delete process.env.OPENROUTER_API_KEY;
       delete process.env.OPENAI_API_KEY;
 
       expect(() => {
         new OpenAIService();
-      }).toThrow("OPENAI_API_KEY is not defined in .env file");
+      }).toThrow("Either OPENROUTER_API_KEY or OPENAI_API_KEY must be defined in .env file");
 
-      process.env.OPENAI_API_KEY = originalKey;
+      process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
+      process.env.OPENAI_API_KEY = originalOpenAIKey;
     });
 
     it("should parse ALLOWED_CHAT_NAMES correctly", () => {
       process.env.ALLOWED_CHAT_NAMES = "Chat1,Chat2,Chat3";
+      process.env.OPENAI_API_KEY = "test-api-key";
 
       const _client = createClient();
       const chatNames = process.env.ALLOWED_CHAT_NAMES.split(",");
