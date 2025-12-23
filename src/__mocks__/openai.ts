@@ -3,7 +3,7 @@
  * Provides mock implementations for testing without making real API calls
  */
 
-import type { MultiEventResult } from "../openai-service";
+import type { MultiEventResult } from "../llm-service";
 
 // Mock response templates
 const mockResponses: Record<string, MultiEventResult> = {

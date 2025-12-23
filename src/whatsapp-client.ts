@@ -20,7 +20,7 @@ import * as path from "path";
 import * as qrcode from "qrcode-terminal";
 import * as QRCode from "qrcode";
 import NodeCache from "node-cache";
-import { LLMService, type EventDetails } from "./openai-service";
+import { LLMService, type EventDetails } from "./llm-service";
 
 // Type for cached group data persisted to file
 interface PersistedCacheData {

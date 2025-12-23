@@ -1,4 +1,4 @@
-import { LLMService, EventDetails } from "./openai-service";
+import { LLMService, EventDetails } from "./llm-service";
 import dotenv from "dotenv";
 import * as readline from "readline";
 import * as fs from "fs";

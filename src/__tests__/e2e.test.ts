@@ -1,10 +1,10 @@
 /**
  * End-to-End Integration Tests
- * Tests the complete pipeline from WhatsApp message -> OpenAI -> Event extraction
- * Note: Detailed OpenAI service tests are in openai-service.test.ts
+ * Tests the complete pipeline from WhatsApp message -> LLM -> Event extraction
+ * Note: Detailed LLM service tests are in llm-service.test.ts
  */
 
-import { OpenAIService } from "../openai-service";
+import { OpenAIService } from "../llm-service";
 import {
   createMockWAMessage,
   validateMultiEventResult,

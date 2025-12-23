@@ -3,7 +3,7 @@
  * Tests event detection, multi-event extraction, language handling, and error cases
  */
 
-import { OpenAIService } from "../openai-service";
+import { OpenAIService } from "../llm-service";
 import {
   validateEventDetails,
   validateMultiEventResult,

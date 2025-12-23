@@ -1,12 +1,12 @@
 /**
  * Configuration and Edge Case Tests
  * Tests environment variables, target group resolution, and edge cases
- * Note: OpenAI service tests are in openai-service.test.ts
+ * Note: LLM service tests are in llm-service.test.ts
  * Note: WhatsApp client tests are in whatsapp-client.test.ts
  */
 
 import { WhatsAppClient } from "../whatsapp-client";
-import { OpenAIService } from "../openai-service";
+import { OpenAIService } from "../llm-service";
 import { cleanupTestAuthDir } from "./utils/test-helpers";
 
 // Mock modules

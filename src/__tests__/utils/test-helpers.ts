@@ -1,5 +1,5 @@
 import type { WAMessage } from "@whiskeysockets/baileys";
-import type { EventDetails, MultiEventResult } from "../../openai-service";
+import type { EventDetails, MultiEventResult } from "../../llm-service";
 
 /**
  * Helper to create mock WhatsApp messages for testing
