@@ -71,7 +71,9 @@ describe("Configuration and Edge Cases", () => {
 
       expect(() => {
         new OpenAIService();
-      }).toThrow("Either OPENROUTER_API_KEY or OPENAI_API_KEY must be defined in .env file");
+      }).toThrow(
+        "Either OPENROUTER_API_KEY or OPENAI_API_KEY must be defined in .env file"
+      );
 
       process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
       process.env.OPENAI_API_KEY = originalOpenAIKey;

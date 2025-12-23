@@ -52,14 +52,18 @@ export class OpenAIService {
   private readonly MAX_HISTORY_LENGTH = 5;
   private readonly allowedChatNames: string[];
   private readonly model: string;
+  private readonly fallbackModel: string;
+  private readonly isOpenRouter: boolean;
 
   constructor() {
     // Support both OpenRouter and direct OpenAI
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     const openaiKey = process.env.OPENAI_API_KEY;
-    
+
     if (!openRouterKey && !openaiKey) {
-      throw new Error("Either OPENROUTER_API_KEY or OPENAI_API_KEY must be defined in .env file");
+      throw new Error(
+        "Either OPENROUTER_API_KEY or OPENAI_API_KEY must be defined in .env file"
+      );
     }
 
     // Prefer OpenRouter if key is provided
@@ -70,12 +74,21 @@ export class OpenAIService {
       });
       // Default to cost-effective model via OpenRouter
       this.model = process.env.LLM_MODEL || "google/gemini-2.0-flash-lite-001";
-      console.log(`Using OpenRouter with model: ${this.model}`);
+      // Fallback model for rate limits (free Llama as backup)
+      this.fallbackModel =
+        process.env.LLM_FALLBACK_MODEL ||
+        "meta-llama/llama-3.3-70b-instruct:free";
+      this.isOpenRouter = true;
+      console.log(
+        `Using OpenRouter with model: ${this.model} (fallback: ${this.fallbackModel})`
+      );
     } else {
       this.openai = new OpenAI({
         apiKey: openaiKey,
       });
       this.model = process.env.LLM_MODEL || "gpt-5-mini";
+      this.fallbackModel = process.env.LLM_FALLBACK_MODEL || "gpt-5-mini";
+      this.isOpenRouter = false;
       console.log(`Using OpenAI directly with model: ${this.model}`);
     }
 
@@ -249,20 +262,52 @@ For the startDateISO and endDateISO fields:
         console.log("Including image in OpenAI analysis request");
       }
 
-      // Call OpenAI API (via OpenRouter or directly)
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a helpful assistant that analyzes WhatsApp messages to detect events and extract structured details. A single message can contain MULTIPLE events - make sure to extract ALL of them. For Hebrew content, provide Hebrew output for summary, title, and location. You are also skilled at converting dates and times to ISO format. IMPORTANT: When interpreting dates, remember that events are usually in the future - prefer future dates over past dates when there is ambiguity. When an image is provided, analyze both the text and the image content to detect events (such as event flyers, invitations, posters, etc.).",
-          },
-          { role: "user", content: userContent },
-        ],
-        max_completion_tokens: 3000,
-        response_format: { type: "json_object" },
-      });
+      const systemPrompt =
+        "You are a helpful assistant that analyzes WhatsApp messages to detect events and extract structured details. A single message can contain MULTIPLE events - make sure to extract ALL of them. For Hebrew content, provide Hebrew output for summary, title, and location. You are also skilled at converting dates and times to ISO format. IMPORTANT: When interpreting dates, remember that events are usually in the future - prefer future dates over past dates when there is ambiguity. When an image is provided, analyze both the text and the image content to detect events (such as event flyers, invitations, posters, etc.).";
+
+      // Call API with retry logic for rate limits
+      let response;
+      let usedModel = this.model;
+
+      try {
+        response = await this.openai.chat.completions.create({
+          model: this.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userContent },
+          ],
+          max_completion_tokens: 3000,
+          response_format: { type: "json_object" },
+        });
+      } catch (error: unknown) {
+        const err = error as { status?: number; message?: string };
+        // Check for rate limit (429) or service unavailable (503)
+        if (
+          this.isOpenRouter &&
+          this.fallbackModel !== this.model &&
+          (err.status === 429 || err.status === 503)
+        ) {
+          console.warn(
+            `⚠️ Rate limited on ${this.model}, falling back to ${this.fallbackModel}`
+          );
+          usedModel = this.fallbackModel;
+          response = await this.openai.chat.completions.create({
+            model: this.fallbackModel,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userContent },
+            ],
+            max_completion_tokens: 3000,
+            response_format: { type: "json_object" },
+          });
+        } else {
+          throw error;
+        }
+      }
+
+      if (usedModel !== this.model) {
+        console.log(`✅ Successfully used fallback model: ${usedModel}`);
+      }
 
       const content = response.choices[0]?.message?.content || "";
       const finishReason = response.choices[0]?.finish_reason;
