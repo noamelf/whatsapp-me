@@ -27,7 +27,7 @@ describe("End-to-End Integration Tests", () => {
     jest.clearAllMocks();
 
     // Set up test environment
-    process.env.OPENAI_API_KEY = "test-api-key";
+    process.env.OPENROUTER_API_KEY = "test-openrouter-key";
     process.env.BAILEYS_AUTH_DIR = ".baileys_auth_test";
     process.env.TARGET_GROUP_NAME = "Test Target Group";
   });

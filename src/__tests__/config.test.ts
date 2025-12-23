@@ -26,21 +26,17 @@ describe("Configuration and Edge Cases", () => {
   };
 
   // Ensure API key is set for tests that need it
-  const originalOpenAIKey = process.env.OPENAI_API_KEY;
   const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
 
   beforeAll(() => {
     // Set a test API key if not already set
-    if (!process.env.OPENAI_API_KEY && !process.env.OPENROUTER_API_KEY) {
-      process.env.OPENAI_API_KEY = "test-api-key";
+    if (!process.env.OPENROUTER_API_KEY) {
+      process.env.OPENROUTER_API_KEY = "test-openrouter-key";
     }
   });
 
   afterAll(() => {
-    // Restore original keys
-    if (originalOpenAIKey) {
-      process.env.OPENAI_API_KEY = originalOpenAIKey;
-    }
+    // Restore original key
     if (originalOpenRouterKey) {
       process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
     }
@@ -51,8 +47,8 @@ describe("Configuration and Edge Cases", () => {
     jest.clearAllMocks();
     clients.length = 0;
     // Ensure API key is set for each test
-    if (!process.env.OPENAI_API_KEY && !process.env.OPENROUTER_API_KEY) {
-      process.env.OPENAI_API_KEY = "test-api-key";
+    if (!process.env.OPENROUTER_API_KEY) {
+      process.env.OPENROUTER_API_KEY = "test-openrouter-key";
     }
   });
 
@@ -63,25 +59,20 @@ describe("Configuration and Edge Cases", () => {
   });
 
   describe("Environment Variable Configuration", () => {
-    it("should require either OPENROUTER_API_KEY or OPENAI_API_KEY", () => {
+    it("should require OPENROUTER_API_KEY", () => {
       const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
-      const originalOpenAIKey = process.env.OPENAI_API_KEY;
       delete process.env.OPENROUTER_API_KEY;
-      delete process.env.OPENAI_API_KEY;
 
       expect(() => {
         new OpenAIService();
-      }).toThrow(
-        "Either OPENROUTER_API_KEY or OPENAI_API_KEY must be defined in .env file"
-      );
+      }).toThrow("OPENROUTER_API_KEY must be defined in .env file");
 
       process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
-      process.env.OPENAI_API_KEY = originalOpenAIKey;
     });
 
     it("should parse ALLOWED_CHAT_NAMES correctly", () => {
       process.env.ALLOWED_CHAT_NAMES = "Chat1,Chat2,Chat3";
-      process.env.OPENAI_API_KEY = "test-api-key";
+      process.env.OPENROUTER_API_KEY = "test-openrouter-key";
 
       const _client = createClient();
       const chatNames = process.env.ALLOWED_CHAT_NAMES.split(",");

@@ -53,44 +53,29 @@ export class OpenAIService {
   private readonly allowedChatNames: string[];
   private readonly model: string;
   private readonly fallbackModel: string;
-  private readonly isOpenRouter: boolean;
 
   constructor() {
-    // Support both OpenRouter and direct OpenAI
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    const openaiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
 
-    if (!openRouterKey && !openaiKey) {
-      throw new Error(
-        "Either OPENROUTER_API_KEY or OPENAI_API_KEY must be defined in .env file"
-      );
+    if (!apiKey) {
+      throw new Error("OPENROUTER_API_KEY must be defined in .env file");
     }
 
-    // Prefer OpenRouter if key is provided
-    if (openRouterKey) {
-      this.openai = new OpenAI({
-        apiKey: openRouterKey,
-        baseURL: "https://openrouter.ai/api/v1",
-      });
-      // Default to cost-effective model via OpenRouter
-      this.model = process.env.LLM_MODEL || "google/gemini-2.0-flash-lite-001";
-      // Fallback model for rate limits (free Llama as backup)
-      this.fallbackModel =
-        process.env.LLM_FALLBACK_MODEL ||
-        "meta-llama/llama-3.3-70b-instruct:free";
-      this.isOpenRouter = true;
-      console.log(
-        `Using OpenRouter with model: ${this.model} (fallback: ${this.fallbackModel})`
-      );
-    } else {
-      this.openai = new OpenAI({
-        apiKey: openaiKey,
-      });
-      this.model = process.env.LLM_MODEL || "gpt-5-mini";
-      this.fallbackModel = process.env.LLM_FALLBACK_MODEL || "gpt-5-mini";
-      this.isOpenRouter = false;
-      console.log(`Using OpenAI directly with model: ${this.model}`);
-    }
+    this.openai = new OpenAI({
+      apiKey: apiKey,
+      baseURL: "https://openrouter.ai/api/v1",
+    });
+
+    // Default to free Gemini model
+    this.model = process.env.LLM_MODEL || "google/gemini-2.0-flash-exp:free";
+    // Fallback model for rate limits
+    this.fallbackModel =
+      process.env.LLM_FALLBACK_MODEL ||
+      "meta-llama/llama-3.3-70b-instruct:free";
+
+    console.log(
+      `Using OpenRouter with model: ${this.model} (fallback: ${this.fallbackModel})`
+    );
 
     // Get allowed chat names from environment variable
     const allowedChatNamesStr = process.env.ALLOWED_CHAT_NAMES;
@@ -283,7 +268,6 @@ For the startDateISO and endDateISO fields:
         const err = error as { status?: number; message?: string };
         // Check for rate limit (429) or service unavailable (503)
         if (
-          this.isOpenRouter &&
           this.fallbackModel !== this.model &&
           (err.status === 429 || err.status === 503)
         ) {

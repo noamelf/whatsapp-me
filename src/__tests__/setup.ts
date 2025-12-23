@@ -3,10 +3,11 @@
  */
 
 // Set test environment variables
-// Support both OpenRouter and OpenAI keys for testing
-process.env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
-process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || "test-api-key";
-process.env.LLM_MODEL = process.env.LLM_MODEL || "gpt-5-mini";
+process.env.OPENROUTER_API_KEY =
+  process.env.OPENROUTER_API_KEY || "test-openrouter-key";
+process.env.LLM_MODEL = process.env.LLM_MODEL || "google/gemini-2.0-flash-exp:free";
+process.env.LLM_FALLBACK_MODEL =
+  process.env.LLM_FALLBACK_MODEL || "meta-llama/llama-3.3-70b-instruct:free";
 process.env.TARGET_GROUP_NAME = "Test Group";
 process.env.BAILEYS_AUTH_DIR = ".baileys_auth_test";
 process.env.NODE_ENV = "test";
