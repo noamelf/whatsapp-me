@@ -192,19 +192,20 @@ For the startDateISO and endDateISO fields:
         "en-US",
         { year: "numeric", month: "long", day: "numeric" }
       )}
-2. Assume any date and time mentioned is in Israel timezone
-3. If the time is not specified, set the time to 8:00 AM (08:00) and end time to 9:00 AM (09:00)
-4. If there is no year mentioned, assume the current year (${new Date().toLocaleDateString(
+2. IMPORTANT: Events are usually in the future. When interpreting relative dates (e.g., "Sunday", "Monday") or ambiguous dates, prefer future dates over past dates. For example, if today is Wednesday and the message mentions "Monday", it most likely refers to next Monday, not last Monday.
+3. Assume any date and time mentioned is in Israel timezone
+4. If the time is not specified, set the time to 8:00 AM (08:00) and end time to 9:00 AM (09:00)
+5. If there is no year mentioned, assume the current year (${new Date().toLocaleDateString(
         "en-US",
         { year: "numeric" }
       )})
-5. If there is no month mentioned, assume the current month (${new Date().toLocaleDateString(
+6. If there is no month mentioned, assume the current month (${new Date().toLocaleDateString(
         "en-US",
         { month: "long" }
       )})
-6. If a time is specified, set the end time to 1 hour after the start time
-7. If you can't determine a date, use the current date
-8. Convert to ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)
+7. If a time is specified, set the end time to 1 hour after the start time
+8. If you can't determine a date, use the current date
+9. Convert to ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)
 `;
 
       // Build the message content array for the API call
@@ -238,7 +239,7 @@ For the startDateISO and endDateISO fields:
           {
             role: "system",
             content:
-              "You are a helpful assistant that analyzes WhatsApp messages to detect events and extract structured details. A single message can contain MULTIPLE events - make sure to extract ALL of them. For Hebrew content, provide Hebrew output for summary, title, and location. You are also skilled at converting dates and times to ISO format. When an image is provided, analyze both the text and the image content to detect events (such as event flyers, invitations, posters, etc.).",
+              "You are a helpful assistant that analyzes WhatsApp messages to detect events and extract structured details. A single message can contain MULTIPLE events - make sure to extract ALL of them. For Hebrew content, provide Hebrew output for summary, title, and location. You are also skilled at converting dates and times to ISO format. IMPORTANT: When interpreting dates, remember that events are usually in the future - prefer future dates over past dates when there is ambiguity. When an image is provided, analyze both the text and the image content to detect events (such as event flyers, invitations, posters, etc.).",
           },
           { role: "user", content: userContent },
         ],
