@@ -17,11 +17,11 @@ async function main() {
     );
     console.log("==================================\n");
 
-    // Check if OpenAI API key is set
-    if (!process.env.OPENAI_API_KEY) {
-      console.error("Error: OPENAI_API_KEY is not defined in .env file");
-      console.log("Please create a .env file with your OpenAI API key:");
-      console.log("OPENAI_API_KEY=your_api_key_here");
+    // Check if API key is set
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.error("Error: OPENROUTER_API_KEY is not defined in .env file");
+      console.log("Please create a .env file with your OpenRouter API key:");
+      console.log("OPENROUTER_API_KEY=your_api_key_here");
       process.exit(1);
     }
 

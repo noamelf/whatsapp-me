@@ -1,27 +1,22 @@
 /**
- * Agent Instructions: OpenAI Model Guide
+ * LLM Service for Event Detection
  *
- * Models:
- * - Default: gpt-5-mini (cost-optimized; supports text+image, structured outputs)
- * - Escalation: gpt-5.2 for complex/ambiguous cases; prefer Responses API if using reasoning
+ * This service uses OpenRouter to access multiple LLM providers (Gemini, Llama, etc.)
+ * for analyzing WhatsApp messages and extracting event information.
  *
- * Parameters:
- * - Use `max_completion_tokens` (not `max_tokens`)
- * - Use `response_format: { type: "json_object" }` for structured output
- * - Do NOT send `temperature`, `top_p`, or `logprobs` to gpt-5-mini (will error)
- * - For gpt-5.2, these are only supported with Responses API when `reasoning.effort = "none"`
+ * Configuration:
+ * - Primary model: LLM_MODEL env var (default: google/gemini-2.0-flash-exp:free)
+ * - Fallback model: LLM_FALLBACK_MODEL env var (for rate limit handling)
  *
- * Vision:
- * - Pass images via messages[].content using an `image_url` item with data URI
- *   (data:<mime>;base64,<payload>) and `detail: "auto"`
+ * Features:
+ * - Multi-provider support via OpenRouter
+ * - Automatic fallback on rate limits (429/503)
+ * - Vision support for image analysis
+ * - Hebrew language support
  *
  * Output schema:
  * - Must match MultiEventResult with Hebrew fields when content is Hebrew
  * - Convert dates to Israel timezone and ISO; apply defaults when missing
- *
- * Policy:
- * - Start with gpt-5-mini; escalate to gpt-5.2 on repeated parse failures,
- *   multi-event ambiguity, or heavy visual content requiring stronger reasoning
  */
 import OpenAI from "openai";
 import dotenv from "dotenv";
@@ -46,8 +41,8 @@ export interface MultiEventResult {
   events: EventDetails[];
 }
 
-export class OpenAIService {
-  private openai: OpenAI;
+export class LLMService {
+  private client: OpenAI;
   private messageHistory = new Map<string, string[]>();
   private readonly MAX_HISTORY_LENGTH = 5;
   private readonly allowedChatNames: string[];
@@ -61,7 +56,7 @@ export class OpenAIService {
       throw new Error("OPENROUTER_API_KEY must be defined in .env file");
     }
 
-    this.openai = new OpenAI({
+    this.client = new OpenAI({
       apiKey: apiKey,
       baseURL: "https://openrouter.ai/api/v1",
     });
@@ -74,7 +69,7 @@ export class OpenAIService {
       "meta-llama/llama-3.3-70b-instruct:free";
 
     console.log(
-      `Using OpenRouter with model: ${this.model} (fallback: ${this.fallbackModel})`
+      `Using LLM model: ${this.model} (fallback: ${this.fallbackModel})`
     );
 
     // Get allowed chat names from environment variable
@@ -244,7 +239,7 @@ For the startDateISO and endDateISO fields:
             detail: "auto",
           },
         });
-        console.log("Including image in OpenAI analysis request");
+        console.log("Including image in LLM analysis request");
       }
 
       const systemPrompt =
@@ -255,7 +250,7 @@ For the startDateISO and endDateISO fields:
       let usedModel = this.model;
 
       try {
-        response = await this.openai.chat.completions.create({
+        response = await this.client.chat.completions.create({
           model: this.model,
           messages: [
             { role: "system", content: systemPrompt },
@@ -275,7 +270,7 @@ For the startDateISO and endDateISO fields:
             `⚠️ Rate limited on ${this.model}, falling back to ${this.fallbackModel}`
           );
           usedModel = this.fallbackModel;
-          response = await this.openai.chat.completions.create({
+          response = await this.client.chat.completions.create({
             model: this.fallbackModel,
             messages: [
               { role: "system", content: systemPrompt },
@@ -378,7 +373,7 @@ For the startDateISO and endDateISO fields:
         };
       }
     } catch (error) {
-      console.error("Error analyzing message with OpenAI:", error);
+      console.error("Error analyzing message with LLM:", error);
       return {
         hasEvents: false,
         events: [],
@@ -386,3 +381,6 @@ For the startDateISO and endDateISO fields:
     }
   }
 }
+
+// Backward compatibility alias
+export { LLMService as OpenAIService };

@@ -20,7 +20,7 @@ import * as path from "path";
 import * as qrcode from "qrcode-terminal";
 import * as QRCode from "qrcode";
 import NodeCache from "node-cache";
-import { OpenAIService, type EventDetails } from "./openai-service";
+import { LLMService, type EventDetails } from "./openai-service";
 
 // Type for cached group data persisted to file
 interface PersistedCacheData {
@@ -54,7 +54,7 @@ export class WhatsAppClient {
   private maxReconnectAttempts = 3;
   private readonly sessionDir = process.env.BAILEYS_AUTH_DIR || ".baileys_auth";
   private readonly cacheFilePath: string;
-  private openaiService: OpenAIService;
+  private llmService: LLMService;
   private targetGroupName = "אני"; // Default target group name (can be overridden via TARGET_GROUP_NAME env var)
   private targetGroupId: string | null = null;
   private shouldReconnect = true;
@@ -65,7 +65,7 @@ export class WhatsAppClient {
   constructor() {
     this.groupCache = new NodeCache({ stdTTL: 30 * 60, useClones: false }); // 30 minute TTL
     this.cacheFilePath = path.join(this.sessionDir, "group_cache.json");
-    this.openaiService = new OpenAIService();
+    this.llmService = new LLMService();
 
     // Configure target group from environment variables
     this.configureTargetGroup();
@@ -560,7 +560,7 @@ export class WhatsAppClient {
       );
 
       // Add message to history for this chat
-      this.openaiService.addMessageToHistory(chatId, messageText);
+      this.llmService.addMessageToHistory(chatId, messageText);
 
       // Process the message (shared logic with test endpoint)
       await this.processMessageForEvents(
@@ -668,7 +668,7 @@ export class WhatsAppClient {
       `Analyzing message for events...${imageBase64 ? " (with image)" : ""}`
     );
 
-    const analysis = await this.openaiService.analyzeMessage(
+    const analysis = await this.llmService.analyzeMessage(
       chatId,
       messageText,
       chatName,

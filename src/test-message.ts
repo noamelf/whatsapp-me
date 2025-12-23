@@ -1,4 +1,4 @@
-import { OpenAIService, EventDetails } from "./openai-service";
+import { LLMService, EventDetails } from "./openai-service";
 import dotenv from "dotenv";
 import * as readline from "readline";
 import * as fs from "fs";
@@ -77,14 +77,14 @@ function saveIcsFile(eventDetails: EventDetails, index: number): string {
 }
 
 async function testMessage(message: string): Promise<void> {
-  const openaiService = new OpenAIService();
+  const llmService = new LLMService();
 
   console.log("\n" + "=".repeat(60));
   console.log("Testing message:");
   console.log(`"${message}"`);
   console.log("=".repeat(60) + "\n");
 
-  const result = await openaiService.analyzeMessage(
+  const result = await llmService.analyzeMessage(
     "test-chat-id",
     message,
     "Test Chat", // Chat name - use a name that's in your ALLOWED_CHAT_NAMES or leave ALLOWED_CHAT_NAMES empty
@@ -153,9 +153,9 @@ function interactiveMode(): void {
 }
 
 async function main(): Promise<void> {
-  // Check if OpenAI API key is set
-  if (!process.env.OPENAI_API_KEY) {
-    console.error("Error: OPENAI_API_KEY is not defined in .env file");
+  // Check if API key is set
+  if (!process.env.OPENROUTER_API_KEY) {
+    console.error("Error: OPENROUTER_API_KEY is not defined in .env file");
     process.exit(1);
   }
 
