@@ -8,7 +8,7 @@
   },
   "mounts": [
     "source=whatsapp-me-railway-config,target=/home/node/.railway,type=volume",
-    "source=whatsapp-me-checkly-config,target=/home/node/.checkly,type=volume"
+    "source=${localEnv:HOME}/Library/Preferences/@checkly,target=/home/node/.config/@checkly,type=bind"
   ],
   "customizations": {
     "vscode": {

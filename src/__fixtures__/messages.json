@@ -1,0 +1,113 @@
+{
+    "hebrewSingleEvent": {
+        "text": "מחר בשעה 10:00 יש לנו פגישה בקפה נחלת בנימין",
+        "expectedEvents": 1,
+        "expectedLanguage": "hebrew",
+        "description": "Single Hebrew event with date, time, and location"
+    },
+    "hebrewMultipleEvents": {
+        "text": "שבוע טוב!\n\nיום ראשון 22/12\nיום יצירה\n\nיום שני 23/12\nנוסעים לכפר בלום בשעה 9:00",
+        "expectedEvents": 2,
+        "expectedLanguage": "hebrew",
+        "description": "Multiple Hebrew events with different dates"
+    },
+    "englishEvent": {
+        "text": "Meeting tomorrow at 2pm in the office. Please bring your laptops.",
+        "expectedEvents": 1,
+        "expectedLanguage": "english",
+        "description": "Single English event with relative date"
+    },
+    "englishMultipleEvents": {
+        "text": "Team events this week:\n1. Monday 9am - Standup in Room A\n2. Wednesday 3pm - Sprint review in Conference Room\n3. Friday 5pm - Happy hour at the rooftop bar",
+        "expectedEvents": 3,
+        "expectedLanguage": "english",
+        "description": "Multiple English events with specific days and times"
+    },
+    "mixedLanguage": {
+        "text": "Meeting מחר at 10:00 בoffice",
+        "expectedEvents": 1,
+        "expectedLanguage": "mixed",
+        "description": "Mixed Hebrew and English content"
+    },
+    "falsePositivePast": {
+        "text": "I went to the movies yesterday. It was great!",
+        "expectedEvents": 0,
+        "description": "Past event reference - should not be detected as future event"
+    },
+    "falsePositiveCasual": {
+        "text": "Hey, how are you? Want to grab coffee sometime?",
+        "expectedEvents": 0,
+        "description": "Casual conversation without concrete event details"
+    },
+    "falsePositiveQuestion": {
+        "text": "What time is the meeting?",
+        "expectedEvents": 0,
+        "description": "Question about an event, not event creation"
+    },
+    "complexDateTime": {
+        "text": "Dentist appointment next Tuesday at 15:30 at Dr. Smith's clinic on Main Street",
+        "expectedEvents": 1,
+        "expectedLanguage": "english",
+        "description": "Event with relative date (next Tuesday) and 24-hour time format"
+    },
+    "hebrewRelativeDate": {
+        "text": "מחרתיים בשעה 8 בבוקר יש טיול לים המלח",
+        "expectedEvents": 1,
+        "expectedLanguage": "hebrew",
+        "description": "Hebrew with relative date (day after tomorrow)"
+    },
+    "eventWithoutTime": {
+        "text": "Company picnic on Saturday at Central Park",
+        "expectedEvents": 1,
+        "expectedLanguage": "english",
+        "description": "Event with date but no specific time (should default to 08:00)"
+    },
+    "eventWithoutLocation": {
+        "text": "Team standup tomorrow at 9:30am",
+        "expectedEvents": 1,
+        "expectedLanguage": "english",
+        "description": "Event without explicit location"
+    },
+    "allDayEvent": {
+        "text": "Holiday vacation from December 25th to December 31st",
+        "expectedEvents": 1,
+        "expectedLanguage": "english",
+        "description": "Multi-day event"
+    },
+    "hebrewWithEmojis": {
+        "text": "🎉 מסיבת יום הולדת מחר בשעה 20:00 בבית של דני 🎂",
+        "expectedEvents": 1,
+        "expectedLanguage": "hebrew",
+        "description": "Hebrew event with emojis"
+    },
+    "recurringEvent": {
+        "text": "Weekly team meeting every Monday at 10am in Conference Room B",
+        "expectedEvents": 1,
+        "expectedLanguage": "english",
+        "description": "Recurring event (note: currently only creates first occurrence)"
+    },
+    "ambiguousDate": {
+        "text": "Let's meet on the 15th at noon",
+        "expectedEvents": 1,
+        "expectedLanguage": "english",
+        "description": "Date without explicit month (should infer from context)"
+    },
+    "eventWithDuration": {
+        "text": "Yoga class tomorrow from 6pm to 7:30pm at Fitness Center",
+        "expectedEvents": 1,
+        "expectedLanguage": "english",
+        "description": "Event with explicit duration"
+    },
+    "hebrewDateFormats": {
+        "text": "פגישה ב-25.12.2025 בשעה 14:00",
+        "expectedEvents": 1,
+        "expectedLanguage": "hebrew",
+        "description": "Hebrew event with numeric date format"
+    },
+    "multipleLocations": {
+        "text": "Tour starting at 10am from City Hall, then to Museum at 12pm, ending at Restaurant at 2pm",
+        "expectedEvents": 3,
+        "expectedLanguage": "english",
+        "description": "Multiple events at different locations forming a tour"
+    }
+}

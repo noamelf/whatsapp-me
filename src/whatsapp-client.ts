@@ -888,6 +888,12 @@ export class WhatsAppClient {
   public async disconnect(): Promise<void> {
     this.shouldReconnect = false;
 
+    // Clear the cache flush interval
+    if (this.cacheFlushInterval) {
+      clearInterval(this.cacheFlushInterval);
+      this.cacheFlushInterval = null;
+    }
+
     if (this.socket) {
       try {
         await this.socket.logout();
