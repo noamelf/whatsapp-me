@@ -22,6 +22,7 @@ import * as qrcode from "qrcode-terminal";
 import * as QRCode from "qrcode";
 import NodeCache from "node-cache";
 import { LLMService, type EventDetails } from "./llm-service";
+import type { TenantConfig } from "./tenant-config";
 
 // Type for cached group data persisted to file
 interface PersistedCacheData {
@@ -67,7 +68,7 @@ export class WhatsAppClient {
   private hasEverConnected = false;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 3;
-  private readonly sessionDir = process.env.BAILEYS_AUTH_DIR || ".baileys_auth";
+  private readonly sessionDir: string;
   private readonly cacheFilePath: string;
   private readonly eventsFilePath: string;
   private llmService: LLMService;
@@ -83,15 +84,27 @@ export class WhatsAppClient {
   private readonly PHOTO_FLOOD_THRESHOLD = 3; // Number of photos to consider a flood
   private readonly PHOTO_FLOOD_WINDOW_MS = 30000; // 30 seconds window
   private readonly PHOTO_FLOOD_CAPTION_THRESHOLD = 0.7; // 70% without captions triggers flood detection
+  private readonly tenantId: string;
+  private readonly allowedChatNames: string[];
 
-  constructor() {
+  constructor(tenantConfig?: TenantConfig) {
+    // Configure session directory from tenant config or environment
+    this.sessionDir = tenantConfig?.sessionDir || process.env.BAILEYS_AUTH_DIR || ".baileys_auth";
+    this.tenantId = tenantConfig?.id || "default";
+    
     this.groupCache = new NodeCache({ stdTTL: 30 * 60, useClones: false }); // 30 minute TTL
     this.cacheFilePath = path.join(this.sessionDir, "group_cache.json");
     this.eventsFilePath = path.join(this.sessionDir, "created_events.json");
     this.llmService = new LLMService();
 
-    // Configure target group from environment variables
-    this.configureTargetGroup();
+    // Configure target group from tenant config or environment variables
+    this.configureTargetGroup(tenantConfig);
+    
+    // Configure allowed chat names from tenant config or environment
+    this.allowedChatNames = tenantConfig?.allowedChatNames || 
+      (process.env.ALLOWED_CHAT_NAMES ? 
+        process.env.ALLOWED_CHAT_NAMES.split(",").map((name) => name.trim()) : 
+        []);
 
     // Ensure session directory exists
     this.ensureSessionDir();
@@ -119,30 +132,43 @@ export class WhatsAppClient {
     });
   }
 
-  private configureTargetGroup(): void {
-    // Read target group configuration from environment variables
-    const envTargetGroupId = process.env.TARGET_GROUP_ID?.trim();
-    const envTargetGroupName = process.env.TARGET_GROUP_NAME?.trim();
-
-    if (envTargetGroupId) {
-      // If TARGET_GROUP_ID is provided, use it directly
-      this.targetGroupId = envTargetGroupId;
-      // Also set the group name if provided, otherwise we'll fetch it later
-      if (envTargetGroupName) {
-        this.targetGroupName = envTargetGroupName;
+  private configureTargetGroup(tenantConfig?: TenantConfig): void {
+    // Prioritize tenant config over environment variables
+    if (tenantConfig?.targetGroupId) {
+      this.targetGroupId = tenantConfig.targetGroupId;
+      if (tenantConfig.targetGroupName) {
+        this.targetGroupName = tenantConfig.targetGroupName;
       }
       console.log(
-        `Using target group ID from environment: ${this.targetGroupId}`
+        `[${this.tenantId}] Using target group ID from tenant config: ${this.targetGroupId}`
       );
-    } else if (envTargetGroupName) {
-      // If only TARGET_GROUP_NAME is provided, use it for searching
-      this.targetGroupName = envTargetGroupName;
+    } else if (tenantConfig?.targetGroupName) {
+      this.targetGroupName = tenantConfig.targetGroupName;
       console.log(
-        `Will search for target group by name: "${this.targetGroupName}"`
+        `[${this.tenantId}] Will search for target group by name: "${this.targetGroupName}"`
       );
     } else {
-      // Use default value if nothing is configured in .env
-      console.log(`Using default target group name: "${this.targetGroupName}"`);
+      // Fallback to environment variables (for backward compatibility)
+      const envTargetGroupId = process.env.TARGET_GROUP_ID?.trim();
+      const envTargetGroupName = process.env.TARGET_GROUP_NAME?.trim();
+
+      if (envTargetGroupId) {
+        this.targetGroupId = envTargetGroupId;
+        if (envTargetGroupName) {
+          this.targetGroupName = envTargetGroupName;
+        }
+        console.log(
+          `[${this.tenantId}] Using target group ID from environment: ${this.targetGroupId}`
+        );
+      } else if (envTargetGroupName) {
+        this.targetGroupName = envTargetGroupName;
+        console.log(
+          `[${this.tenantId}] Will search for target group by name: "${this.targetGroupName}"`
+        );
+      } else {
+        // Use default value if nothing is configured
+        console.log(`[${this.tenantId}] Using default target group name: "${this.targetGroupName}"`);
+      }
     }
   }
 

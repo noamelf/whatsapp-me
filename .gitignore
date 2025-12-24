@@ -131,6 +131,10 @@ dist
 
 # Baileys authentication directory
 .baileys_auth/
+.baileys_auth_*/
+
+# Tenant configuration (contains sensitive WhatsApp group IDs)
+tenants.json
 
 # macOS
 .DS_Store

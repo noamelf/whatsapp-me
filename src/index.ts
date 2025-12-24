@@ -1,4 +1,4 @@
-import { WhatsAppClient } from "./whatsapp-client";
+import { TenantManager } from "./tenant-manager";
 import { HealthServer } from "./health-server";
 import dotenv from "dotenv";
 
@@ -25,46 +25,57 @@ async function main() {
       process.exit(1);
     }
 
-    // Initialize WhatsApp client
-    const whatsappClient = new WhatsAppClient();
+    // Initialize Tenant Manager
+    const tenantManager = new TenantManager();
 
     try {
-      await whatsappClient.initialize();
-      console.log("WhatsApp client initialized successfully!");
-
-      // Add a delay after initialization to ensure WhatsApp is fully loaded
-      console.log("Waiting for WhatsApp to fully load before proceeding...");
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-
-      console.log("\nWhatsApp connection established successfully.");
-      console.log("Your session has been saved for future use.");
+      await tenantManager.initializeAll();
+      
+      console.log("\nWhatsApp connection(s) established successfully.");
+      console.log("Your session(s) have been saved for future use.");
       console.log(
         "The application will now listen for messages and analyze them for events."
       );
-      console.log(
-        `Event summaries will be sent to the "${whatsappClient.getTargetGroupName()}" WhatsApp group.`
-      );
 
-      // Start listening for incoming messages
-      whatsappClient.startListeningForMessages();
+      const tenantStatuses = tenantManager.getAllTenantStatuses();
+      tenantStatuses.forEach((status) => {
+        console.log(
+          `  - Tenant ${status.tenantId}: Target group "${status.targetGroupName}"`
+        );
+      });
+
+      // Start listening for incoming messages on all tenants
+      tenantManager.startListeningForAllTenants();
 
       // Start health check server with test message handler
       const healthPort = parseInt(process.env.PORT || "3000", 10);
       const testEndpointToken = process.env.TEST_ENDPOINT_TOKEN;
       const healthServer = new HealthServer(
         () => ({
-          isConnected: whatsappClient.isConnected(),
-          connectionState: whatsappClient.getConnectionState(),
-          hasEverConnected: whatsappClient.getHasEverConnected(),
+          isConnected: tenantManager.isAnyTenantConnected(),
+          connectionState: tenantManager.haveAllTenantsEverConnected() ? "open" : "close",
+          hasEverConnected: tenantManager.haveAllTenantsEverConnected(),
+          tenantStatuses: tenantManager.getAllTenantStatuses(),
         }),
         // Message handler for test endpoint
         async (text, chatName, imageBase64, imageMimeType) => {
-          return await whatsappClient.testMessage(
+          // Use first tenant for test endpoint (backward compatibility)
+          const result = await tenantManager.testMessageForFirstTenant(
             text,
             chatName,
             imageBase64,
             imageMimeType
           );
+          
+          // Return empty result if no tenant available
+          if (!result) {
+            return {
+              hasEvents: false,
+              events: [],
+            };
+          }
+          
+          return result;
         },
         testEndpointToken
       );
@@ -73,7 +84,7 @@ async function main() {
       // Keep the application running until user terminates it
       await new Promise(() => {}); // This promise never resolves, keeping the app running
     } catch (error) {
-      console.error("Failed to initialize WhatsApp client:", error);
+      console.error("Failed to initialize WhatsApp clients:", error);
       console.log("Please check your internet connection and try again.");
       process.exit(1);
     }
@@ -87,12 +98,12 @@ async function main() {
 process.on("SIGINT", () => {
   console.log("\nShutting down...");
   console.log(
-    "Your session has been saved. You can restart the application without scanning the QR code again."
+    "Your session(s) have been saved. You can restart the application without scanning the QR code again."
   );
 
-  // Try to gracefully disconnect if we have a client instance
+  // Try to gracefully disconnect if we have a tenant manager instance
   try {
-    // We would need to pass the client reference here in a real implementation
+    // We would need to pass the tenant manager reference here in a real implementation
     // For now, we'll just exit
     process.exit(0);
   } catch (error) {
