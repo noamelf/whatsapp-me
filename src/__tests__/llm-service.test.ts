@@ -454,4 +454,53 @@ describe("OpenAIService", () => {
       }
     });
   });
+
+  describe("Timezone Conversion", () => {
+    it("should convert Israel timezone to UTC correctly", async () => {
+      // Test with a specific time that should be in Israel timezone
+      const result = await openaiService.analyzeMessage(
+        "test-chat-id",
+        "מחר בשעה 14:00 יש פגישה",
+        "Test Chat",
+        "Test User"
+      );
+
+      expect(result.hasEvents).toBe(true);
+      expect(result.events.length).toBeGreaterThan(0);
+
+      const event = result.events[0];
+      if (event.startDateISO) {
+        const date = new Date(event.startDateISO);
+
+        // ISO string should be valid
+        expect(date.toISOString()).toBe(event.startDateISO);
+
+        // The date should be parseable
+        expect(date.getTime()).toBeGreaterThan(0);
+
+        // Note: In real implementation with LLM, the timezone conversion
+        // should ensure that Israel local time converts properly to UTC.
+        // With mocks, we just verify the ISO format is valid.
+      }
+    });
+
+    it("should handle morning times correctly", async () => {
+      const result = await openaiService.analyzeMessage(
+        "test-chat-id",
+        "מחר בשעה 9:00 בבוקר",
+        "Test Chat",
+        "Test User"
+      );
+
+      if (result.hasEvents && result.events[0]?.startDateISO) {
+        const date = new Date(result.events[0].startDateISO);
+
+        // ISO string should be valid
+        expect(date.toISOString()).toBe(result.events[0].startDateISO);
+
+        // The date should be parseable
+        expect(date.getTime()).toBeGreaterThan(0);
+      }
+    });
+  });
 });

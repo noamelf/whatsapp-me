@@ -224,7 +224,7 @@ For the startDateISO and endDateISO fields:
         { year: "numeric", month: "long", day: "numeric" }
       )}
 2. IMPORTANT: Events are usually in the future. When interpreting relative dates (e.g., "Sunday", "Monday") or ambiguous dates, prefer future dates over past dates. For example, if today is Wednesday and the message mentions "Monday", it most likely refers to next Monday, not last Monday.
-3. Assume any date and time mentioned is in Israel timezone
+3. Assume any date and time mentioned is in Israel timezone (Asia/Jerusalem, UTC+2 or UTC+3 with DST)
 4. If the time is not specified, set the time to 8:00 AM (08:00) and end time to 9:00 AM (09:00)
 5. If there is no year mentioned, assume the current year (${new Date().toLocaleDateString(
         "en-US",
@@ -236,7 +236,7 @@ For the startDateISO and endDateISO fields:
       )})
 7. If a time is specified, set the end time to 1 hour after the start time
 8. If you can't determine a date, use the current date
-9. Convert to ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)
+9. CRITICAL: Convert the Israel timezone date/time to UTC and output in ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ). Israel (Asia/Jerusalem) observes Daylight Saving Time, so use the correct UTC offset for the specific date: UTC+2 during standard time (roughly October-March) or UTC+3 during daylight saving time (roughly March-October). For example, if the user says "10:00" on a date in December, interpret this as 10:00 Israel Standard Time (UTC+2) and convert it to "08:00:00.000Z". If the date is in July, interpret as 10:00 Israel Daylight Time (UTC+3) and convert to "07:00:00.000Z".
 `;
 
       // Build the message content array for the API call
