@@ -61,12 +61,12 @@ export class LLMService {
       baseURL: "https://openrouter.ai/api/v1",
     });
 
-    // Default to paid Gemini model (no data policy restrictions)
-    this.model = process.env.LLM_MODEL || "google/gemini-2.0-flash-001";
+    // Default to free Gemini model
+    this.model = process.env.LLM_MODEL || "google/gemini-2.0-flash-exp:free";
     // Fallback model for rate limits
     this.fallbackModel =
       process.env.LLM_FALLBACK_MODEL ||
-      "google/gemini-flash-1.5";
+      "meta-llama/llama-3.3-70b-instruct:free";
 
     console.log(
       `Using LLM model: ${this.model} (fallback: ${this.fallbackModel})`
@@ -128,7 +128,10 @@ export class LLMService {
     message: string,
     chatName: string,
     sender?: string,
-    imageBase64OrHistory?: string | { text: string; timestamp: number }[] | null,
+    imageBase64OrHistory?:
+      | string
+      | { text: string; timestamp: number }[]
+      | null,
     imageMimeType?: string | null
   ): Promise<MultiEventResult> {
     try {
@@ -147,7 +150,7 @@ export class LLMService {
       // Handle either conversation history array or image base64 string
       let imageBase64: string | null = null;
       let externalHistory: string[] = [];
-      
+
       if (Array.isArray(imageBase64OrHistory)) {
         // It's conversation history
         externalHistory = imageBase64OrHistory.map((h) => h.text);
@@ -158,7 +161,8 @@ export class LLMService {
 
       // Get the message history for context (combine internal + external)
       const internalHistory = this.getMessageHistory(chatId);
-      const history = externalHistory.length > 0 ? externalHistory : internalHistory;
+      const history =
+        externalHistory.length > 0 ? externalHistory : internalHistory;
 
       // Create the prompt for OpenAI
       const imageNote = imageBase64
@@ -277,6 +281,8 @@ For the startDateISO and endDateISO fields:
           ],
           max_completion_tokens: 3000,
           response_format: { type: "json_object" },
+          // @ts-expect-error OpenRouter-specific: prevent data collection/training
+          provider: { data_collection: "deny" },
         });
       } catch (error: unknown) {
         const err = error as { status?: number; message?: string };
@@ -297,6 +303,8 @@ For the startDateISO and endDateISO fields:
             ],
             max_completion_tokens: 3000,
             response_format: { type: "json_object" },
+            // @ts-expect-error OpenRouter-specific: prevent data collection/training
+            provider: { data_collection: "deny" },
           });
         } else {
           throw error;
