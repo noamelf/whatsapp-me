@@ -10,6 +10,7 @@ This application connects to WhatsApp using the Baileys library, listens for mes
 - Reuse existing sessions to avoid repeated QR code scanning
 - Listen for all incoming WhatsApp messages in real-time
 - Analyze messages using OpenAI to detect events
+- **Web-based Admin Interface** - Manage configuration through a simple web UI with authentication
 - **Support for multiple events in a single message** - Extract all events when a message contains more than one
 - **Photo flood detection** - Automatically skip LLM analysis when receiving many photos without captions to save API tokens
 - Extract structured event details (title, date, time, location, description)
@@ -84,7 +85,15 @@ This application connects to WhatsApp using the Baileys library, listens for mes
    - If not set, the endpoint is publicly accessible (not recommended for production)
    - See [TEST_ENDPOINT.md](docs/TEST_ENDPOINT.md) for usage examples
 
-4. (Optional) Add `ALLOWED_CHAT_NAMES` to your `.env` file to filter which chats are analyzed:
+4. (Optional) Set an admin password for the web interface:
+   ```
+   ADMIN_PASSWORD=your_secure_admin_password
+   ```
+   - If not set, the first login will set the password
+   - Used to access the admin interface at `/admin`
+   - See [ADMIN_INTERFACE.md](docs/ADMIN_INTERFACE.md) for details
+
+5. (Optional) Add `ALLOWED_CHAT_NAMES` to your `.env` file to filter which chats are analyzed:
    ```
    ALLOWED_CHAT_NAMES=Family Group,Work Team,Book Club
    ```
@@ -92,6 +101,7 @@ This application connects to WhatsApp using the Baileys library, listens for mes
    - If set, only messages from chats whose names include any of the specified names will be analyzed
    - Names are case-sensitive and use partial matching (e.g., "Family Group" will match "My Family Group" or "Family Group Chat")
    - Multiple names can be specified by separating them with commas
+   - Can also be managed through the admin interface at `/admin`
 
 ## Usage
 
@@ -116,14 +126,29 @@ This application connects to WhatsApp using the Baileys library, listens for mes
    - Send summaries of detected events to the "אני" WhatsApp group
    - Send calendar event information that can be added to your calendar
    - Display all messages in the console
+   - Start a web server with health check and admin interface
 
-4. For development with auto-restart:
+4. Access the admin interface:
+
+   ```
+   http://localhost:3000/admin
+   ```
+
+   Use the admin interface to:
+   - Manage which chats are monitored for events
+   - Configure where event summaries are sent
+   - Change the admin password
+   - View current configuration
+
+   See [ADMIN_INTERFACE.md](docs/ADMIN_INTERFACE.md) for detailed documentation.
+
+5. For development with auto-restart:
 
    ```
    npm run dev
    ```
 
-5. To test event detection without WhatsApp:
+6. To test event detection without WhatsApp:
 
    ```bash
    # Set your token (from .env)
