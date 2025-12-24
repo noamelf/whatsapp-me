@@ -10,6 +10,7 @@ This application connects to WhatsApp using the Baileys library, listens for mes
 - Reuse existing sessions to avoid repeated QR code scanning
 - Listen for all incoming WhatsApp messages in real-time
 - Analyze messages using OpenAI to detect events
+- **Multi-tenant support** - Run multiple WhatsApp accounts simultaneously in a single deployment
 - **Support for multiple events in a single message** - Extract all events when a message contains more than one
 - **Photo flood detection** - Automatically skip LLM analysis when receiving many photos without captions to save API tokens
 - Extract structured event details (title, date, time, location, description)
@@ -137,6 +138,69 @@ This application connects to WhatsApp using the Baileys library, listens for mes
    ```
 
    See [TEST_ENDPOINT.md](TEST_ENDPOINT.md) for detailed API documentation.
+
+## Multi-Tenant Configuration
+
+The application supports running multiple WhatsApp accounts simultaneously in a single deployment. This is useful when you want to monitor different WhatsApp accounts and send events to different target groups.
+
+### Setup
+
+1. Create a `tenants.json` file in the project root (see `tenants.json.example` for reference):
+
+   ```json
+   {
+     "tenants": [
+       {
+         "id": "tenant1",
+         "targetGroupId": "120363123456789012@g.us",
+         "targetGroupName": "Events Group 1",
+         "allowedChatNames": ["Family", "Work Team"],
+         "sessionDir": ".baileys_auth_tenant1"
+       },
+       {
+         "id": "tenant2",
+         "targetGroupId": "120363987654321098@g.us",
+         "targetGroupName": "Events Group 2",
+         "allowedChatNames": ["Friends", "Book Club"],
+         "sessionDir": ".baileys_auth_tenant2"
+       }
+     ]
+   }
+   ```
+
+2. Each tenant configuration includes:
+   - `id` (required): Unique identifier for the tenant
+   - `targetGroupId` (optional): WhatsApp group ID where events will be sent
+   - `targetGroupName` (optional): Name of the target group (used for searching if ID not provided)
+   - `allowedChatNames` (optional): Array of chat names to monitor (if empty, all chats are monitored)
+   - `sessionDir` (optional): Custom directory for storing WhatsApp session data (defaults to `.baileys_auth_{tenantId}`)
+
+3. When `tenants.json` exists, the application will:
+   - Ignore environment variable configuration (except `OPENROUTER_API_KEY`)
+   - Initialize one WhatsApp client per tenant
+   - Each tenant will have its own QR code during first-time setup
+   - Sessions are stored separately for each tenant
+   - Events from each tenant are sent to their respective target groups
+
+### Multi-Tenant Mode Features
+
+- **Isolated Sessions**: Each tenant has its own WhatsApp session stored in a separate directory
+- **Independent Configuration**: Each tenant can monitor different chats and send events to different groups
+- **Parallel Processing**: All tenants run simultaneously and process messages independently
+- **Health Monitoring**: The `/health` endpoint reports status for all tenants
+- **Backward Compatible**: Single-tenant mode still works via environment variables when `tenants.json` doesn't exist
+
+### Example Use Cases
+
+1. **Personal and Work Accounts**: Monitor your personal and work WhatsApp accounts separately, sending events to different calendar groups
+2. **Multiple Clients**: Provide event detection service to multiple clients with separate accounts and target groups
+3. **Department Separation**: Different departments can have their own WhatsApp monitoring with custom chat filters
+
+### Notes
+
+- Each tenant will need to scan a QR code during initial setup
+- Railway volume mount should include all tenant session directories (e.g., `.baileys_auth_*`)
+- All tenants share the same OpenRouter API key
 
 ## Testing Event Detection
 

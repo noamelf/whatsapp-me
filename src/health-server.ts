@@ -6,12 +6,26 @@ interface HealthStatus {
   connectionState: string;
   uptime: number;
   timestamp: string;
+  tenantStatuses?: {
+    tenantId: string;
+    isConnected: boolean;
+    connectionState: string;
+    hasEverConnected: boolean;
+    targetGroupName: string;
+  }[];
 }
 
 type StatusProvider = () => {
   isConnected: boolean;
   connectionState: string;
   hasEverConnected: boolean;
+  tenantStatuses?: {
+    tenantId: string;
+    isConnected: boolean;
+    connectionState: string;
+    hasEverConnected: boolean;
+    targetGroupName: string;
+  }[];
 };
 
 type MessageHandler = (
@@ -188,7 +202,7 @@ export class HealthServer {
   }
 
   private getHealthStatus(): HealthStatus {
-    const { isConnected, connectionState, hasEverConnected } =
+    const { isConnected, connectionState, hasEverConnected, tenantStatuses } =
       this.statusProvider();
     const uptimeMs = Date.now() - this.startTime.getTime();
 
@@ -211,6 +225,7 @@ export class HealthServer {
       connectionState,
       uptime: Math.floor(uptimeMs / 1000),
       timestamp: new Date().toISOString(),
+      tenantStatuses,
     };
   }
 

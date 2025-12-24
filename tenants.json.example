@@ -1,0 +1,18 @@
+{
+  "tenants": [
+    {
+      "id": "tenant1",
+      "targetGroupId": "120363123456789012@g.us",
+      "targetGroupName": "Events Group 1",
+      "allowedChatNames": ["Family", "Work Team"],
+      "sessionDir": ".baileys_auth_tenant1"
+    },
+    {
+      "id": "tenant2",
+      "targetGroupId": "120363987654321098@g.us",
+      "targetGroupName": "Events Group 2",
+      "allowedChatNames": ["Friends", "Book Club"],
+      "sessionDir": ".baileys_auth_tenant2"
+    }
+  ]
+}
