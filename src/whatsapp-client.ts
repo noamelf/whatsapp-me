@@ -82,6 +82,7 @@ export class WhatsAppClient {
   private recentImageMessages = new Map<string, ImageMessageTimestamp[]>();
   private readonly PHOTO_FLOOD_THRESHOLD = 3; // Number of photos to consider a flood
   private readonly PHOTO_FLOOD_WINDOW_MS = 30000; // 30 seconds window
+  private readonly PHOTO_FLOOD_CAPTION_THRESHOLD = 0.7; // 70% without captions triggers flood detection
 
   constructor() {
     this.groupCache = new NodeCache({ stdTTL: 30 * 60, useClones: false }); // 30 minute TTL
@@ -359,18 +360,15 @@ export class WhatsAppClient {
       return false;
     }
     
-    const now = Date.now();
-    const cutoffTime = now - this.PHOTO_FLOOD_WINDOW_MS;
-    const recentImages = chatImages.filter(img => img.timestamp > cutoffTime);
-    
+    // chatImages is already filtered by trackImageMessage to only contain recent images
     // Consider it a photo flood if we have PHOTO_FLOOD_THRESHOLD or more photos
     // and most of them don't have captions (suggesting they're just photos, not event info)
-    if (recentImages.length >= this.PHOTO_FLOOD_THRESHOLD) {
-      const imagesWithoutCaptions = recentImages.filter(img => !img.hasCaption).length;
-      const percentageWithoutCaptions = imagesWithoutCaptions / recentImages.length;
+    if (chatImages.length >= this.PHOTO_FLOOD_THRESHOLD) {
+      const imagesWithoutCaptions = chatImages.filter(img => !img.hasCaption).length;
+      const percentageWithoutCaptions = imagesWithoutCaptions / chatImages.length;
       
-      // If 70% or more of the images don't have captions, consider it a photo flood
-      return percentageWithoutCaptions >= 0.7;
+      // Use the configurable threshold to determine if it's a photo flood
+      return percentageWithoutCaptions >= this.PHOTO_FLOOD_CAPTION_THRESHOLD;
     }
     
     return false;
