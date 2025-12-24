@@ -37,6 +37,12 @@ interface CreatedEvent {
   createdAt: number;
 }
 
+// Type for tracking recent image messages to detect photo floods
+interface ImageMessageTimestamp {
+  timestamp: number;
+  hasCaption: boolean;
+}
+
 // Type for connection update from Baileys
 interface BaileysConnectionUpdate {
   connection?: WAConnectionState;
@@ -73,6 +79,9 @@ export class WhatsAppClient {
   private cacheFlushInterval: NodeJS.Timeout | null = null;
   private createdEvents = new Map<string, CreatedEvent>();
   private readonly EVENT_RETENTION_DAYS = 30; // Keep events for 30 days
+  private recentImageMessages = new Map<string, ImageMessageTimestamp[]>();
+  private readonly PHOTO_FLOOD_THRESHOLD = 3; // Number of photos to consider a flood
+  private readonly PHOTO_FLOOD_WINDOW_MS = 30000; // 30 seconds window
 
   constructor() {
     this.groupCache = new NodeCache({ stdTTL: 30 * 60, useClones: false }); // 30 minute TTL
@@ -316,6 +325,55 @@ export class WhatsAppClient {
         this.createdEvents.delete(fingerprint);
       }
     }
+  }
+
+  /**
+   * Track an image message for photo flood detection
+   */
+  private trackImageMessage(chatId: string, hasCaption: boolean): void {
+    const now = Date.now();
+    
+    if (!this.recentImageMessages.has(chatId)) {
+      this.recentImageMessages.set(chatId, []);
+    }
+    
+    const chatImages = this.recentImageMessages.get(chatId);
+    if (!chatImages) return;
+    
+    // Add the new image
+    chatImages.push({ timestamp: now, hasCaption });
+    
+    // Clean up old images outside the window
+    const cutoffTime = now - this.PHOTO_FLOOD_WINDOW_MS;
+    const filteredImages = chatImages.filter(img => img.timestamp > cutoffTime);
+    this.recentImageMessages.set(chatId, filteredImages);
+  }
+
+  /**
+   * Check if we're receiving a photo flood (multiple photos in quick succession)
+   * A photo flood is defined as PHOTO_FLOOD_THRESHOLD or more photos within PHOTO_FLOOD_WINDOW_MS
+   */
+  private isPhotoFlood(chatId: string): boolean {
+    const chatImages = this.recentImageMessages.get(chatId);
+    if (!chatImages || chatImages.length < this.PHOTO_FLOOD_THRESHOLD) {
+      return false;
+    }
+    
+    const now = Date.now();
+    const cutoffTime = now - this.PHOTO_FLOOD_WINDOW_MS;
+    const recentImages = chatImages.filter(img => img.timestamp > cutoffTime);
+    
+    // Consider it a photo flood if we have PHOTO_FLOOD_THRESHOLD or more photos
+    // and most of them don't have captions (suggesting they're just photos, not event info)
+    if (recentImages.length >= this.PHOTO_FLOOD_THRESHOLD) {
+      const imagesWithoutCaptions = recentImages.filter(img => !img.hasCaption).length;
+      const percentageWithoutCaptions = imagesWithoutCaptions / recentImages.length;
+      
+      // If 70% or more of the images don't have captions, consider it a photo flood
+      return percentageWithoutCaptions >= 0.7;
+    }
+    
+    return false;
   }
 
 
@@ -617,6 +675,16 @@ export class WhatsAppClient {
         // Get caption if present
         messageText = message.message.imageMessage?.caption || "";
         imageMimeType = message.message.imageMessage?.mimetype || "image/jpeg";
+        
+        // Track this image message for photo flood detection
+        const hasCaption = messageText.trim().length > 0;
+        this.trackImageMessage(chatId, hasCaption);
+        
+        // Check if we're receiving a photo flood (lots of photos without captions)
+        if (this.isPhotoFlood(chatId)) {
+          console.log(`⚠️ Photo flood detected in chat ${chatId}, skipping LLM analysis to save tokens`);
+          return;
+        }
 
         // Download the image
         try {

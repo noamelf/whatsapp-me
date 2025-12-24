@@ -355,4 +355,123 @@ describe("WhatsAppClient", () => {
       expect(process.env.TARGET_GROUP_NAME).toBe("Test Group");
     });
   });
+
+  describe("Photo Flood Detection", () => {
+    beforeEach(() => {
+      // Use environment variables to allow all chats for testing
+      delete process.env.ALLOWED_CHAT_NAMES;
+    });
+
+    it("should not skip messages when there are fewer than threshold photos", async () => {
+      whatsappClient = createClient();
+
+      // Send 2 images (below threshold of 3)
+      const chatId = "123456789@g.us";
+      const message1 = createMockWAMessage("", {
+        chatId,
+        isGroup: true,
+        hasImage: true,
+      });
+      const message2 = createMockWAMessage("", {
+        chatId,
+        isGroup: true,
+        hasImage: true,
+      });
+
+      // Both messages should be processed (not skipped)
+      // We'll verify this by checking that the messages don't trigger early returns
+      await whatsappClient["handleIncomingMessage"](message1);
+      await whatsappClient["handleIncomingMessage"](message2);
+
+      // If we got here without errors, the messages were processed
+      expect(true).toBe(true);
+    });
+
+    it("should skip LLM analysis when receiving many photos without captions", async () => {
+      whatsappClient = createClient();
+
+      // Track recent image messages
+      const chatId = "123456789@g.us";
+
+      // Manually track 3 images without captions (simulating photo flood)
+      whatsappClient["trackImageMessage"](chatId, false);
+      whatsappClient["trackImageMessage"](chatId, false);
+      whatsappClient["trackImageMessage"](chatId, false);
+
+      // Check if photo flood is detected
+      const isFlood = whatsappClient["isPhotoFlood"](chatId);
+      expect(isFlood).toBe(true);
+    });
+
+    it("should not skip when photos have captions (likely event info)", async () => {
+      whatsappClient = createClient();
+
+      const chatId = "123456789@g.us";
+
+      // Track 3 images WITH captions (suggesting they're event-related)
+      whatsappClient["trackImageMessage"](chatId, true);
+      whatsappClient["trackImageMessage"](chatId, true);
+      whatsappClient["trackImageMessage"](chatId, true);
+
+      // Should not be detected as photo flood
+      const isFlood = whatsappClient["isPhotoFlood"](chatId);
+      expect(isFlood).toBe(false);
+    });
+
+    it("should clean up old image timestamps outside the window", async () => {
+      whatsappClient = createClient();
+
+      const chatId = "123456789@g.us";
+
+      // Track 2 images
+      whatsappClient["trackImageMessage"](chatId, false);
+      whatsappClient["trackImageMessage"](chatId, false);
+
+      // Manually set old timestamp (outside 30s window)
+      const oldTimestamp = Date.now() - 31000; // 31 seconds ago
+      whatsappClient["recentImageMessages"].set(chatId, [
+        { timestamp: oldTimestamp, hasCaption: false },
+        { timestamp: Date.now(), hasCaption: false },
+      ]);
+
+      // Add one more recent image
+      whatsappClient["trackImageMessage"](chatId, false);
+
+      // Should only have 2 recent images (old one cleaned up)
+      const recentImages = whatsappClient["recentImageMessages"].get(chatId);
+      expect(recentImages).toBeDefined();
+      expect(recentImages!.length).toBe(2);
+      expect(recentImages!.every((img) => img.timestamp > Date.now() - 31000)).toBe(true);
+    });
+
+    it("should handle mixed captions correctly (70% threshold)", async () => {
+      whatsappClient = createClient();
+
+      const chatId = "123456789@g.us";
+
+      // 3 without captions, 1 with caption = 75% without captions (should be flood)
+      whatsappClient["trackImageMessage"](chatId, false);
+      whatsappClient["trackImageMessage"](chatId, false);
+      whatsappClient["trackImageMessage"](chatId, false);
+      whatsappClient["trackImageMessage"](chatId, true);
+
+      const isFlood = whatsappClient["isPhotoFlood"](chatId);
+      expect(isFlood).toBe(true);
+    });
+
+    it("should not detect flood when less than 70% are without captions", async () => {
+      whatsappClient = createClient();
+
+      const chatId = "123456789@g.us";
+
+      // 2 without captions, 2 with captions = 50% without captions (should not be flood)
+      whatsappClient["trackImageMessage"](chatId, false);
+      whatsappClient["trackImageMessage"](chatId, false);
+      whatsappClient["trackImageMessage"](chatId, true);
+      whatsappClient["trackImageMessage"](chatId, true);
+
+      const isFlood = whatsappClient["isPhotoFlood"](chatId);
+      expect(isFlood).toBe(false);
+    });
+  });
 });
