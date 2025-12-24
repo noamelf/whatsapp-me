@@ -210,3 +210,24 @@ export function cleanupTestAuthDir(dirPath = ".baileys_auth_test"): void {
     fs.rmSync(dirPath, { recursive: true, force: true });
   }
 }
+
+/**
+ * Helper to create a mock event for testing
+ */
+export function createMockEvent(
+  overrides: Partial<EventDetails> = {}
+): EventDetails {
+  return {
+    isEvent: true,
+    summary: overrides.summary ?? "Test Event Summary",
+    title: overrides.title ?? "Test Event",
+    date: overrides.date ?? "2024-12-25",
+    time: overrides.time ?? "10:00",
+    location: overrides.location ?? "Test Location",
+    description: overrides.description ?? "Test Description",
+    startDateISO:
+      overrides.startDateISO ?? "2024-12-25T08:00:00.000Z",
+    endDateISO:
+      overrides.endDateISO ?? "2024-12-25T09:00:00.000Z",
+  };
+}
