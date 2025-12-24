@@ -119,9 +119,9 @@ Events extracted must conform to:
 
 ### Code Quality
 
-- **Before every commit**, run both linter and tests:
+- **Before every commit**, run build, linter, and tests:
   ```bash
-  npm run lint && npm test
+  npm run build && npm run lint && npm test
   ```
 - Fix all linter errors - the build will fail in CI if linting fails
 - Fix all failing tests before committing
@@ -159,7 +159,7 @@ Events extracted must conform to:
   3. Commit changes: `git add -A && git commit -m "your message"`
   4. Push to GitHub: `git push origin main`
   5. Railway automatically detects the push and starts deployment
-  6. Wait for deployment to complete (typically 1-2 minutes)
+  6. Check deployment success via Railway MCP
   7. Verify with Checkly: `npm run checkly:test`
 - **Health Check**: Railway uses `/health` endpoint for deployment health checks (configured in railway.toml)
 - **Environment Variables**: Set in Railway dashboard (OPENAI_API_KEY, TEST_ENDPOINT_TOKEN, etc.)
