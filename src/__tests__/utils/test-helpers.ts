@@ -102,7 +102,9 @@ export function validateEventDetails(event: EventDetails): void {
 
     if (event.endDateISO) {
       expect(() => new Date(event.endDateISO as string)).not.toThrow();
-      expect(new Date(event.endDateISO as string).toISOString()).toBe(event.endDateISO);
+      expect(new Date(event.endDateISO as string).toISOString()).toBe(
+        event.endDateISO
+      );
     }
 
     // End date should be after start date
@@ -200,9 +202,7 @@ export function containsHebrew(text: string): boolean {
 /**
  * Helper to clean up test auth directories
  */
-export function cleanupTestAuthDir(
-  dirPath = ".baileys_auth_test"
-): void {
+export function cleanupTestAuthDir(dirPath = ".baileys_auth_test"): void {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs") as typeof import("fs");
 

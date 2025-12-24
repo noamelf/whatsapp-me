@@ -23,11 +23,10 @@
         "typescript.preferences.importModuleSpecifier": "relative",
         "mcp": {
           "servers": {
-            "railway": {
-              "command": "railway",
-              "args": [
-                "mcp"
-              ]
+            "Railway": {
+              "type": "stdio",
+              "command": "npx",
+              "args": ["-y", "@railway/mcp-server"]
             }
           }
         }

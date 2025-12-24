@@ -116,13 +116,19 @@ export class LLMService {
 
   /**
    * Analyze a message to detect if it contains one or more events
+   * @param chatId - The chat identifier
+   * @param message - The message text to analyze
+   * @param chatName - The name of the chat/group
+   * @param sender - Optional sender name
+   * @param imageBase64OrHistory - Optional base64 image data OR conversation history array
+   * @param imageMimeType - Optional MIME type of the image (required if imageBase64OrHistory is image data)
    */
   public async analyzeMessage(
     chatId: string,
     message: string,
     chatName: string,
     sender?: string,
-    imageBase64?: string | null,
+    imageBase64OrHistory?: string | { text: string; timestamp: number }[] | null,
     imageMimeType?: string | null
   ): Promise<MultiEventResult> {
     try {
@@ -138,8 +144,21 @@ export class LLMService {
         };
       }
 
-      // Get the message history for context
-      const history = this.getMessageHistory(chatId);
+      // Handle either conversation history array or image base64 string
+      let imageBase64: string | null = null;
+      let externalHistory: string[] = [];
+      
+      if (Array.isArray(imageBase64OrHistory)) {
+        // It's conversation history
+        externalHistory = imageBase64OrHistory.map((h) => h.text);
+      } else if (typeof imageBase64OrHistory === "string") {
+        // It's image data
+        imageBase64 = imageBase64OrHistory;
+      }
+
+      // Get the message history for context (combine internal + external)
+      const internalHistory = this.getMessageHistory(chatId);
+      const history = externalHistory.length > 0 ? externalHistory : internalHistory;
 
       // Create the prompt for OpenAI
       const imageNote = imageBase64
