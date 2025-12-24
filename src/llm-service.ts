@@ -236,7 +236,7 @@ For the startDateISO and endDateISO fields:
       )})
 7. If a time is specified, set the end time to 1 hour after the start time
 8. If you can't determine a date, use the current date
-9. CRITICAL: Convert the Israel timezone date/time to UTC and output in ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ). For example, if the user says "10:00", interpret this as 10:00 Israel time and convert it to UTC (subtract 2 or 3 hours depending on DST). So "10:00 Israel time" becomes "08:00:00.000Z" (winter) or "07:00:00.000Z" (summer) in the ISO output.
+9. CRITICAL: Convert the Israel timezone date/time to UTC and output in ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ). Israel (Asia/Jerusalem) observes Daylight Saving Time, so use the correct UTC offset for the specific date: UTC+2 during standard time (roughly October-March) or UTC+3 during daylight saving time (roughly March-October). For example, if the user says "10:00" on a date in December, interpret this as 10:00 Israel Standard Time (UTC+2) and convert it to "08:00:00.000Z". If the date is in July, interpret as 10:00 Israel Daylight Time (UTC+3) and convert to "07:00:00.000Z".
 `;
 
       // Build the message content array for the API call
