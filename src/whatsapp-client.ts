@@ -17,6 +17,7 @@ import pino from "pino";
 import { Boom } from "@hapi/boom";
 import * as fs from "fs";
 import * as path from "path";
+import * as crypto from "crypto";
 import * as qrcode from "qrcode-terminal";
 import * as QRCode from "qrcode";
 import NodeCache from "node-cache";
@@ -26,6 +27,14 @@ import { LLMService, type EventDetails } from "./llm-service";
 interface PersistedCacheData {
   data: GroupMetadata;
   savedAt: number;
+}
+
+// Type for tracking created events
+interface CreatedEvent {
+  fingerprint: string;
+  title: string;
+  startDateISO: string;
+  createdAt: number;
 }
 
 // Type for connection update from Baileys
@@ -54,6 +63,7 @@ export class WhatsAppClient {
   private maxReconnectAttempts = 3;
   private readonly sessionDir = process.env.BAILEYS_AUTH_DIR || ".baileys_auth";
   private readonly cacheFilePath: string;
+  private readonly eventsFilePath: string;
   private llmService: LLMService;
   private targetGroupName = "אני"; // Default target group name (can be overridden via TARGET_GROUP_NAME env var)
   private targetGroupId: string | null = null;
@@ -61,10 +71,13 @@ export class WhatsAppClient {
   private connectionState: WAConnectionState = "close";
   private groupCache: NodeCache;
   private cacheFlushInterval: NodeJS.Timeout | null = null;
+  private createdEvents = new Map<string, CreatedEvent>();
+  private readonly EVENT_RETENTION_DAYS = 30; // Keep events for 30 days
 
   constructor() {
     this.groupCache = new NodeCache({ stdTTL: 30 * 60, useClones: false }); // 30 minute TTL
     this.cacheFilePath = path.join(this.sessionDir, "group_cache.json");
+    this.eventsFilePath = path.join(this.sessionDir, "created_events.json");
     this.llmService = new LLMService();
 
     // Configure target group from environment variables
@@ -76,17 +89,23 @@ export class WhatsAppClient {
     // Load persisted cache
     this.loadCacheFromFile();
 
+    // Load persisted events
+    this.loadEventsFromFile();
+
     // Set up periodic cache saving (every 5 minutes)
     this.cacheFlushInterval = setInterval(() => {
       this.saveCacheToFile();
+      this.saveEventsToFile();
     }, 5 * 60 * 1000);
 
     // Save cache on process exit
     process.on("SIGTERM", () => {
       this.saveCacheToFile();
+      this.saveEventsToFile();
     });
     process.on("SIGINT", () => {
       this.saveCacheToFile();
+      this.saveEventsToFile();
     });
   }
 
@@ -189,6 +208,116 @@ export class WhatsAppClient {
       console.error("Error loading cache from file:", error);
     }
   }
+
+  /**
+   * Generate a fingerprint for an event to detect duplicates
+   * Uses title, date, time, and location to create a unique hash
+   */
+  private generateEventFingerprint(event: EventDetails): string {
+    // Normalize the data for hashing
+    const title = (event.title || "").toLowerCase().trim();
+    const startDateISO = event.startDateISO || "";
+    const location = (event.location || "").toLowerCase().trim();
+    
+    // Create a string from the key fields
+    const fingerprintData = `${title}|${startDateISO}|${location}`;
+    
+    // Generate SHA256 hash
+    return crypto.createHash("sha256").update(fingerprintData).digest("hex");
+  }
+
+  /**
+   * Check if an event was already created
+   */
+  private isEventAlreadyCreated(event: EventDetails): boolean {
+    const fingerprint = this.generateEventFingerprint(event);
+    return this.createdEvents.has(fingerprint);
+  }
+
+  /**
+   * Mark an event as created
+   */
+  private markEventAsCreated(event: EventDetails): void {
+    const fingerprint = this.generateEventFingerprint(event);
+    this.createdEvents.set(fingerprint, {
+      fingerprint,
+      title: event.title || "",
+      startDateISO: event.startDateISO || "",
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * Save created events to file for persistence across restarts
+   */
+  private saveEventsToFile(): void {
+    try {
+      // Clean up old events before saving
+      this.cleanupOldEvents();
+
+      const eventsArray = Array.from(this.createdEvents.values());
+      
+      if (eventsArray.length > 0) {
+        fs.writeFileSync(
+          this.eventsFilePath,
+          JSON.stringify(eventsArray, null, 2)
+        );
+        console.log(`Saved ${eventsArray.length} event(s) to events file`);
+      }
+    } catch (error) {
+      console.error("Error saving events to file:", error);
+    }
+  }
+
+  /**
+   * Load created events from file on startup
+   */
+  private loadEventsFromFile(): void {
+    try {
+      if (!fs.existsSync(this.eventsFilePath)) {
+        console.log("No events file found, starting fresh");
+        return;
+      }
+
+      const data = fs.readFileSync(this.eventsFilePath, "utf-8");
+      const eventsArray = JSON.parse(data) as CreatedEvent[];
+
+      const maxAge = this.EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+      let loadedCount = 0;
+      let expiredCount = 0;
+
+      for (const event of eventsArray) {
+        // Only load if not too old
+        if (Date.now() - event.createdAt < maxAge) {
+          this.createdEvents.set(event.fingerprint, event);
+          loadedCount++;
+        } else {
+          expiredCount++;
+        }
+      }
+
+      console.log(
+        `Loaded ${loadedCount} event(s) from events file (${expiredCount} expired)`
+      );
+    } catch (error) {
+      console.error("Error loading events from file:", error);
+    }
+  }
+
+  /**
+   * Clean up events older than EVENT_RETENTION_DAYS
+   */
+  private cleanupOldEvents(): void {
+    const maxAge = this.EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    
+    for (const [fingerprint, event] of this.createdEvents.entries()) {
+      if (now - event.createdAt > maxAge) {
+        this.createdEvents.delete(fingerprint);
+      }
+    }
+  }
+
 
   /**
    * Fetch group metadata with rate limiting and exponential backoff
@@ -697,6 +826,12 @@ export class WhatsAppClient {
 
           // Format the message for response
           if (event.title && event.startDateISO) {
+            // Check if event was already created
+            if (this.isEventAlreadyCreated(event)) {
+              console.log(`⚠️ Duplicate event detected, skipping: ${event.title} at ${event.startDateISO}`);
+              continue;
+            }
+
             const formattedMessage = this.formatEventMessage(event, chatName);
             formattedMessages.push(formattedMessage);
 
@@ -704,6 +839,8 @@ export class WhatsAppClient {
             if (sendToWhatsApp && this.targetGroupId) {
               await this.sendEventToGroup(this.targetGroupId, event, chatName);
               console.log(`Event sent to "${this.targetGroupName}" group`);
+              // Mark event as created after successful send
+              this.markEventAsCreated(event);
             } else if (sendToWhatsApp && !this.targetGroupId) {
               console.log(
                 `Target group "${this.targetGroupName}" not found. Event not sent.`
@@ -893,6 +1030,9 @@ export class WhatsAppClient {
       clearInterval(this.cacheFlushInterval);
       this.cacheFlushInterval = null;
     }
+
+    // Save events before disconnecting
+    this.saveEventsToFile();
 
     if (this.socket) {
       try {

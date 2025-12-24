@@ -1,5 +1,7 @@
 # WhatsApp Event Detection System
 
+[![CI](https://github.com/noamelf/whatsapp-me/actions/workflows/ci.yml/badge.svg)](https://github.com/noamelf/whatsapp-me/actions/workflows/ci.yml)
+
 This application connects to WhatsApp using the Baileys library, listens for messages, and uses OpenAI to detect events in the messages. When an event is detected, it creates a summary and sends it to a designated WhatsApp group, along with calendar event information that can be added to your calendar.
 
 ## Features
