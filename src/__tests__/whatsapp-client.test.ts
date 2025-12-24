@@ -387,7 +387,7 @@ describe("WhatsAppClient", () => {
       expect(true).toBe(true);
     });
 
-    it("should skip LLM analysis when receiving many photos without captions", async () => {
+    it("should skip LLM analysis when receiving many photos without captions", () => {
       whatsappClient = createClient();
 
       // Track recent image messages
@@ -403,7 +403,7 @@ describe("WhatsAppClient", () => {
       expect(isFlood).toBe(true);
     });
 
-    it("should not skip when photos have captions (likely event info)", async () => {
+    it("should not skip when photos have captions (likely event info)", () => {
       whatsappClient = createClient();
 
       const chatId = "123456789@g.us";
@@ -418,7 +418,7 @@ describe("WhatsAppClient", () => {
       expect(isFlood).toBe(false);
     });
 
-    it("should clean up old image timestamps outside the window", async () => {
+    it("should clean up old image timestamps outside the window", () => {
       whatsappClient = createClient();
 
       const chatId = "123456789@g.us";
@@ -440,11 +440,13 @@ describe("WhatsAppClient", () => {
       // Should only have 2 recent images (old one cleaned up)
       const recentImages = whatsappClient["recentImageMessages"].get(chatId);
       expect(recentImages).toBeDefined();
-      expect(recentImages!.length).toBe(2);
-      expect(recentImages!.every((img) => img.timestamp > Date.now() - 31000)).toBe(true);
+      if (recentImages) {
+        expect(recentImages.length).toBe(2);
+        expect(recentImages.every((img) => img.timestamp > Date.now() - 31000)).toBe(true);
+      }
     });
 
-    it("should handle mixed captions correctly (70% threshold)", async () => {
+    it("should handle mixed captions correctly (70% threshold)", () => {
       whatsappClient = createClient();
 
       const chatId = "123456789@g.us";
@@ -459,7 +461,7 @@ describe("WhatsAppClient", () => {
       expect(isFlood).toBe(true);
     });
 
-    it("should not detect flood when less than 70% are without captions", async () => {
+    it("should not detect flood when less than 70% are without captions", () => {
       whatsappClient = createClient();
 
       const chatId = "123456789@g.us";

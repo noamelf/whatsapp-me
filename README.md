@@ -11,6 +11,7 @@ This application connects to WhatsApp using the Baileys library, listens for mes
 - Listen for all incoming WhatsApp messages in real-time
 - Analyze messages using OpenAI to detect events
 - **Support for multiple events in a single message** - Extract all events when a message contains more than one
+- **Photo flood detection** - Automatically skip LLM analysis when receiving many photos without captions to save API tokens
 - Extract structured event details (title, date, time, location, description)
 - Create summaries of detected events
 - Send event summaries to a designated WhatsApp group
@@ -215,6 +216,21 @@ The application intelligently handles various date formats:
 - Month names (e.g., "25 December")
 
 When a day of the week is mentioned without "next" (e.g., just "Monday"), the application assumes the upcoming Monday relative to the current date.
+
+## Token Optimization
+
+The application includes intelligent token-saving features to reduce OpenAI API costs:
+
+### Photo Flood Detection
+
+When someone sends multiple photos in quick succession (typically vacation photos, screenshots, etc.), the system automatically detects this pattern and skips LLM analysis:
+
+- **Threshold**: 3 or more image messages within 30 seconds
+- **Caption-aware**: If 70% or more of the images lack captions (or have minimal text), they're considered "just photos"
+- **Smart filtering**: Images with meaningful captions (likely event invitations or flyers) are still analyzed
+- **Automatic cleanup**: Old message timestamps are automatically cleaned up to prevent memory bloat
+
+This feature can save significant API costs when users share photo albums in group chats, while still analyzing images that may contain event information.
 
 ## Advantages of Baileys over WhatsApp Web
 
