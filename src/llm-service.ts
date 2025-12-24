@@ -61,12 +61,12 @@ export class LLMService {
       baseURL: "https://openrouter.ai/api/v1",
     });
 
-    // Default to free Gemini model
-    this.model = process.env.LLM_MODEL || "google/gemini-2.0-flash-exp:free";
+    // Default to paid Gemini model (no data policy restrictions)
+    this.model = process.env.LLM_MODEL || "google/gemini-2.0-flash-001";
     // Fallback model for rate limits
     this.fallbackModel =
       process.env.LLM_FALLBACK_MODEL ||
-      "meta-llama/llama-3.3-70b-instruct:free";
+      "google/gemini-flash-1.5";
 
     console.log(
       `Using LLM model: ${this.model} (fallback: ${this.fallbackModel})`
