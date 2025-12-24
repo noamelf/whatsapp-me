@@ -63,9 +63,8 @@ export class LLMService {
 
     // Default to cheapest Gemini model (free models require training consent)
     this.model = process.env.LLM_MODEL || "google/gemini-2.0-flash-lite-001";
-    // Fallback model for rate limits
-    this.fallbackModel =
-      process.env.LLM_FALLBACK_MODEL || "openai/gpt-5-nano";
+    // Fallback model for rate limits (must support vision for image analysis)
+    this.fallbackModel = process.env.LLM_FALLBACK_MODEL || "meta-llama/llama-3.2-11b-vision-instruct";
 
     console.log(
       `Using LLM model: ${this.model} (fallback: ${this.fallbackModel})`
