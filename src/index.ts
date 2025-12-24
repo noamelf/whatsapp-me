@@ -1,5 +1,6 @@
 import { WhatsAppClient } from "./whatsapp-client";
 import { HealthServer } from "./health-server";
+import { ConfigService } from "./config-service";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -25,8 +26,11 @@ async function main() {
       process.exit(1);
     }
 
-    // Initialize WhatsApp client
-    const whatsappClient = new WhatsAppClient();
+    // Initialize configuration service
+    const configService = new ConfigService();
+
+    // Initialize WhatsApp client with config service
+    const whatsappClient = new WhatsAppClient(configService);
 
     try {
       await whatsappClient.initialize();
@@ -66,9 +70,13 @@ async function main() {
             imageMimeType
           );
         },
-        testEndpointToken
+        testEndpointToken,
+        configService
       );
       healthServer.start(healthPort);
+      
+      console.log(`\n🔐 Admin interface available at: http://localhost:${healthPort}/admin`);
+      console.log("Use this interface to manage monitored chats and output configuration.");
 
       // Keep the application running until user terminates it
       await new Promise(() => {}); // This promise never resolves, keeping the app running

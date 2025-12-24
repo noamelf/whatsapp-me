@@ -20,6 +20,7 @@
  */
 import OpenAI from "openai";
 import dotenv from "dotenv";
+import { ConfigService } from "./config-service";
 
 // Load environment variables
 dotenv.config();
@@ -45,11 +46,12 @@ export class LLMService {
   private client: OpenAI;
   private messageHistory = new Map<string, string[]>();
   private readonly MAX_HISTORY_LENGTH = 5;
-  private readonly allowedChatNames: string[];
+  private configService: ConfigService;
   private readonly model: string;
   private readonly fallbackModel: string;
 
-  constructor() {
+  constructor(configService?: ConfigService) {
+    this.configService = configService || new ConfigService();
     const apiKey = process.env.OPENROUTER_API_KEY;
 
     if (!apiKey) {
@@ -69,22 +71,30 @@ export class LLMService {
     console.log(
       `Using LLM model: ${this.model} (fallback: ${this.fallbackModel})`
     );
+  }
 
-    // Get allowed chat names from environment variable
-    const allowedChatNamesStr = process.env.ALLOWED_CHAT_NAMES;
-    this.allowedChatNames = allowedChatNamesStr
-      ? allowedChatNamesStr.split(",").map((name) => name.trim())
-      : [];
+  /**
+   * Get allowed chat names from ConfigService
+   */
+  private getAllowedChatNames(): string[] {
+    // Check environment variable first for backward compatibility
+    const envAllowedChatNames = process.env.ALLOWED_CHAT_NAMES;
+    if (envAllowedChatNames) {
+      return envAllowedChatNames.split(",").map((name) => name.trim());
+    }
+    // Otherwise use ConfigService
+    return this.configService.getAllowedChatNames();
   }
 
   /**
    * Check if a chat name is in the allowed list
    */
   private isChatAllowed(chatName: string): boolean {
-    if (this.allowedChatNames.length === 0) {
+    const allowedChatNames = this.getAllowedChatNames();
+    if (allowedChatNames.length === 0) {
       return true; // If no names specified, allow all chats
     }
-    return this.allowedChatNames.some((name) => chatName.includes(name));
+    return allowedChatNames.some((name) => chatName.includes(name));
   }
 
   /**
@@ -138,7 +148,7 @@ export class LLMService {
         console.log(
           `Skipping analysis for chat ID: "${chatId}" - chat name: "${chatName}" - not in allowed list`
         );
-        console.log(`Allowed list:`, JSON.stringify(this.allowedChatNames));
+        console.log(`Allowed list:`, JSON.stringify(this.getAllowedChatNames()));
         return {
           hasEvents: false,
           events: [],
