@@ -472,14 +472,6 @@ export class AdminServer {
                 <div id="successMessage" class="alert alert-success" style="display: none;"></div>
                 <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
 
-                <!-- Current Configuration -->
-                <div class="section">
-                    <h2>Current Configuration</h2>
-                    <div class="info-box" id="currentConfig">
-                        <p><strong>Loading...</strong></p>
-                    </div>
-                </div>
-
                 <!-- Monitored Chats Configuration -->
                 <div class="section">
                     <h2>Monitored Chats</h2>
@@ -516,19 +508,12 @@ export class AdminServer {
 
                         <!-- Target Group Configuration -->
                         <div class="form-group">
-                            <label for="targetGroupId">Target Group ID</label>
-                            <input type="text" id="targetGroupId" placeholder="120363123456789012@g.us">
+                            <label for="targetGroup">Target Group for Event Summaries</label>
+                            <select id="targetGroup" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                                <option value="">Loading groups...</option>
+                            </select>
                             <p class="help-text">
-                                The WhatsApp group ID where event summaries will be sent.
-                                Check the logs when the bot starts to find group IDs.
-                            </p>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="targetGroupName">Target Group Name</label>
-                            <input type="text" id="targetGroupName" placeholder="אני">
-                            <p class="help-text">
-                                The name of the WhatsApp group (used if Group ID is not set).
+                                Select the WhatsApp group where event summaries will be sent.
                             </p>
                         </div>
 
@@ -539,18 +524,23 @@ export class AdminServer {
 
                 <!-- Change Password -->
                 <div class="section">
-                    <h2>Change Admin Password</h2>
-                    <form onsubmit="changePassword(event)">
-                        <div class="form-group">
-                            <label for="newPassword">New Password</label>
-                            <input type="password" id="newPassword" required placeholder="Enter new password">
-                        </div>
-                        <div class="form-group">
-                            <label for="confirmPassword">Confirm Password</label>
-                            <input type="password" id="confirmPassword" required placeholder="Confirm new password">
-                        </div>
-                        <button type="submit" class="btn">Change Password</button>
-                    </form>
+                    <div style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;" onclick="togglePasswordSection()">
+                        <h2 style="margin: 0;">Change Admin Password</h2>
+                        <span id="passwordToggleIcon" style="font-size: 20px;">▼</span>
+                    </div>
+                    <div id="passwordSection" style="display: none; margin-top: 15px;">
+                        <form onsubmit="changePassword(event)">
+                            <div class="form-group">
+                                <label for="newPassword">New Password</label>
+                                <input type="password" id="newPassword" required placeholder="Enter new password">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirmPassword">Confirm Password</label>
+                                <input type="password" id="confirmPassword" required placeholder="Confirm new password">
+                            </div>
+                            <button type="submit" class="btn">Change Password</button>
+                        </form>
+                    </div>
                 </div>
 
                 <!-- Logout -->
@@ -636,9 +626,25 @@ export class AdminServer {
                 }
 
                 renderChatList();
+                populateTargetGroupDropdown();
             } catch (error) {
                 chatList.innerHTML = '<p style="color: #e74c3c; text-align: center;">Network error loading chats</p>';
             }
+        }
+
+        function populateTargetGroupDropdown() {
+            const targetGroupSelect = document.getElementById('targetGroup');
+            
+            // Only show groups in target dropdown (not direct chats)
+            const groups = allChats.filter(chat => chat.isGroup);
+            
+            if (groups.length === 0) {
+                targetGroupSelect.innerHTML = '<option value="">No groups available</option>';
+                return;
+            }
+
+            targetGroupSelect.innerHTML = '<option value="">Select a group...</option>' + 
+                groups.map(group => \`<option value="\${group.id}">\${group.name}</option>\`).join('');
         }
 
         function renderChatList() {
@@ -697,6 +703,18 @@ export class AdminServer {
             }
         }
 
+        function togglePasswordSection() {
+            const section = document.getElementById('passwordSection');
+            const icon = document.getElementById('passwordToggleIcon');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                icon.textContent = '▲';
+            } else {
+                section.style.display = 'none';
+                icon.textContent = '▼';
+            }
+        }
+
         async function loadConfig() {
             try {
                 const response = await fetch('/admin/config', {
@@ -710,23 +728,17 @@ export class AdminServer {
 
                 const config = await response.json();
 
-                // Display current configuration
-                const configDiv = document.getElementById('currentConfig');
-                configDiv.innerHTML = \`
-                    <p><strong>Monitor All Group Chats:</strong> \${config.monitorAllGroupChats ? 'Yes' : 'No'}</p>
-                    <p><strong>Allowed Chats:</strong> \${config.monitorAllGroupChats ? 'All group chats' : (config.allowedChatNames.length > 0 ? config.allowedChatNames.join(', ') : 'All chats')}</p>
-                    <p><strong>Target Group ID:</strong> \${config.targetGroupId || 'Not set'}</p>
-                    <p><strong>Target Group Name:</strong> \${config.targetGroupName || 'Not set'}</p>
-                    <p><strong>Last Updated:</strong> \${new Date(config.lastUpdated).toLocaleString()}</p>
-                \`;
-
                 // Populate form fields
                 document.getElementById('monitorAllGroupChats').checked = config.monitorAllGroupChats || false;
                 selectedChatNames = config.allowedChatNames || [];
                 renderChatList();
                 toggleChatSelection();
-                document.getElementById('targetGroupId').value = config.targetGroupId || '';
-                document.getElementById('targetGroupName').value = config.targetGroupName || '';
+                
+                // Set target group dropdown selection
+                const targetGroupSelect = document.getElementById('targetGroup');
+                if (config.targetGroupId) {
+                    targetGroupSelect.value = config.targetGroupId;
+                }
             } catch (error) {
                 showError('Failed to load configuration');
             }
@@ -736,8 +748,11 @@ export class AdminServer {
             event.preventDefault();
 
             const monitorAllGroupChats = document.getElementById('monitorAllGroupChats').checked;
-            const targetGroupId = document.getElementById('targetGroupId').value.trim();
-            const targetGroupName = document.getElementById('targetGroupName').value.trim();
+            const targetGroupId = document.getElementById('targetGroup').value;
+            
+            // Find the group name from the selected ID
+            const selectedGroup = allChats.find(chat => chat.id === targetGroupId);
+            const targetGroupName = selectedGroup ? selectedGroup.name : '';
 
             try {
                 const response = await fetch('/admin/config', {
