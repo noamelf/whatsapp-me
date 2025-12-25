@@ -1151,6 +1151,42 @@ export class WhatsAppClient {
   }
 
   /**
+   * Get all available chats (groups and direct chats)
+   * Returns an array of chat objects with id, name, and isGroup flag
+   */
+  public async getAllChats(): Promise<{ id: string; name: string; isGroup: boolean }[]> {
+    if (!this.socket || !this.isReady) {
+      throw new Error("WhatsApp client not connected");
+    }
+
+    try {
+      const chats: { id: string; name: string; isGroup: boolean }[] = [];
+
+      // Fetch all groups
+      const groups = await this.socket.groupFetchAllParticipating();
+      for (const [groupId, groupMetadata] of Object.entries(groups)) {
+        chats.push({
+          id: groupId,
+          name: groupMetadata.subject || groupId,
+          isGroup: true,
+        });
+      }
+
+      // Note: Baileys doesn't have a direct method to list all individual chats
+      // We would need to iterate through message history or use store
+      // For now, we'll just return groups, which is the main use case
+
+      // Sort by name
+      chats.sort((a, b) => a.name.localeCompare(b.name));
+
+      return chats;
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Test message processing without WhatsApp (for HTTP endpoint)
    */
   public async testMessage(

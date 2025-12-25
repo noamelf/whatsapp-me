@@ -49,14 +49,16 @@ export class HealthServer {
     statusProvider: StatusProvider,
     messageHandler?: MessageHandler,
     testEndpointToken?: string,
-    configService?: ConfigService
+    configService?: ConfigService,
+    chatProvider?: () => Promise<{ id: string; name: string; isGroup: boolean }[]>
   ) {
     this.startTime = new Date();
     this.statusProvider = statusProvider;
     this.messageHandler = messageHandler;
     this.testEndpointToken = testEndpointToken;
     this.adminServer = new AdminServer(
-      configService || new ConfigService()
+      configService || new ConfigService(),
+      chatProvider
     );
   }
 

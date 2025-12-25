@@ -89,7 +89,13 @@ export class LLMService {
   /**
    * Check if a chat name is in the allowed list
    */
-  private isChatAllowed(chatName: string): boolean {
+  private isChatAllowed(chatName: string, isGroup = false): boolean {
+    // Check if monitoring all group chats
+    const monitorAllGroupChats = this.configService.getMonitorAllGroupChats();
+    if (monitorAllGroupChats && isGroup) {
+      return true; // Monitor all group chats
+    }
+
     const allowedChatNames = this.getAllowedChatNames();
     if (allowedChatNames.length === 0) {
       return true; // If no names specified, allow all chats

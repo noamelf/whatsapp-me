@@ -6,6 +6,7 @@ import * as path from "path";
  */
 export interface ConfigData {
   allowedChatNames: string[];
+  monitorAllGroupChats: boolean; // If true, monitor all group chats (overrides allowedChatNames)
   targetGroupId: string;
   targetGroupName: string;
   adminPassword: string; // Hashed password for admin authentication
@@ -66,6 +67,7 @@ export class ConfigService {
 
     return {
       allowedChatNames,
+      monitorAllGroupChats: false, // Default to false
       targetGroupId: process.env.TARGET_GROUP_ID?.trim() || "",
       targetGroupName: process.env.TARGET_GROUP_NAME?.trim() || "אני",
       adminPassword: process.env.ADMIN_PASSWORD || "", // Empty means no auth initially
@@ -180,5 +182,19 @@ export class ConfigService {
   public hasAdminPassword(): boolean {
     const hash = this.getAdminPasswordHash();
     return hash !== null && hash !== undefined && hash !== "";
+  }
+
+  /**
+   * Get monitor all group chats setting
+   */
+  public getMonitorAllGroupChats(): boolean {
+    return this.getConfig().monitorAllGroupChats || false;
+  }
+
+  /**
+   * Set monitor all group chats setting
+   */
+  public setMonitorAllGroupChats(value: boolean): void {
+    this.updateConfig({ monitorAllGroupChats: value });
   }
 }

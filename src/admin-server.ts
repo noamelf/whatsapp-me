@@ -2,6 +2,9 @@ import * as http from "http";
 import * as crypto from "crypto";
 import { ConfigService } from "./config-service";
 
+// Type for chat provider function
+type ChatProvider = () => Promise<{ id: string; name: string; isGroup: boolean }[]>;
+
 /**
  * Simple admin server for managing WhatsApp bot configuration
  * Provides a web interface and API endpoints for configuration management
@@ -11,9 +14,11 @@ export class AdminServer {
   private sessionToken: string | null = null;
   private readonly sessionTimeout = 30 * 60 * 1000; // 30 minutes
   private sessionExpiry = 0;
+  private chatProvider?: ChatProvider;
 
-  constructor(configService: ConfigService) {
+  constructor(configService: ConfigService, chatProvider?: ChatProvider) {
     this.configService = configService;
+    this.chatProvider = chatProvider;
   }
 
   /**
@@ -99,6 +104,12 @@ export class AdminServer {
       return;
     }
 
+    // Get chats
+    if (req.method === "GET" && url === "/admin/chats") {
+      void this.handleGetChats(res);
+      return;
+    }
+
     // Get configuration
     if (req.method === "GET" && url === "/admin/config") {
       this.handleGetConfig(res);
@@ -173,6 +184,7 @@ export class AdminServer {
     // Don't send password hash to client
     const safeConfig = {
       allowedChatNames: config.allowedChatNames,
+      monitorAllGroupChats: config.monitorAllGroupChats || false,
       targetGroupId: config.targetGroupId,
       targetGroupName: config.targetGroupName,
       lastUpdated: config.lastUpdated,
@@ -180,6 +192,36 @@ export class AdminServer {
     };
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(safeConfig));
+  }
+
+  /**
+   * Handle get chats request - fetch available chats from WhatsApp
+   */
+  private async handleGetChats(res: http.ServerResponse): Promise<void> {
+    try {
+      if (!this.chatProvider) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: "Chat provider not available - WhatsApp client may not be connected",
+          })
+        );
+        return;
+      }
+
+      const chats = await this.chatProvider();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ chats }));
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: "Failed to fetch chats",
+          details: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
   }
 
   /**
@@ -198,10 +240,16 @@ export class AdminServer {
       try {
         const updates = JSON.parse(body) as {
           allowedChatNames?: string[];
+          monitorAllGroupChats?: boolean;
           targetGroupId?: string;
           targetGroupName?: string;
           newPassword?: string;
         };
+
+        // Update monitor all group chats setting
+        if (updates.monitorAllGroupChats !== undefined) {
+          this.configService.setMonitorAllGroupChats(updates.monitorAllGroupChats);
+        }
 
         // Update configuration
         if (updates.allowedChatNames !== undefined) {
@@ -437,12 +485,33 @@ export class AdminServer {
                     <h2>Monitored Chats</h2>
                     <form onsubmit="updateConfig(event)">
                         <div class="form-group">
-                            <label for="allowedChats">Allowed Chat Names (one per line)</label>
-                            <textarea id="allowedChats" placeholder="Family Group&#10;Work Team&#10;Friends Chat"></textarea>
+                            <label>
+                                <input type="checkbox" id="monitorAllGroupChats" onchange="toggleChatSelection()">
+                                Monitor All Group Chats
+                            </label>
                             <p class="help-text">
-                                Enter chat names to monitor, one per line. If empty, all chats will be monitored.
-                                Names are case-sensitive and support partial matching.
+                                When checked, the bot will monitor all WhatsApp group chats for events.
+                                Individual chat selection below will be ignored.
                             </p>
+                        </div>
+
+                        <div id="chatSelectionContainer">
+                            <div class="form-group">
+                                <label for="chatSearch">Search Chats</label>
+                                <input type="text" id="chatSearch" placeholder="Search by chat name..." oninput="filterChats()">
+                                <button type="button" class="btn btn-secondary" onclick="loadChats()" style="margin-top: 10px;">
+                                    Refresh Chats from WhatsApp
+                                </button>
+                                <p class="help-text">
+                                    Select chats to monitor for events. Search to filter the list.
+                                </p>
+                            </div>
+
+                            <div class="form-group">
+                                <div id="chatList" style="max-height: 300px; overflow-y: auto; border: 2px solid #e0e0e0; border-radius: 8px; padding: 10px;">
+                                    <p style="color: #666; text-align: center;">Loading chats...</p>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Target Group Configuration -->
@@ -532,6 +601,100 @@ export class AdminServer {
             document.getElementById('loginForm').classList.remove('active');
             document.getElementById('adminPanel').classList.add('active');
             loadConfig();
+            loadChats();
+        }
+
+        let allChats = [];
+        let selectedChatNames = [];
+
+        async function loadChats() {
+            const chatList = document.getElementById('chatList');
+            chatList.innerHTML = '<p style="color: #666; text-align: center;">Loading chats from WhatsApp...</p>';
+            
+            try {
+                const response = await fetch('/admin/chats', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    chatList.innerHTML = '<p style="color: #e74c3c; text-align: center;">Error: ' + (error.error || 'Failed to load chats') + '</p>';
+                    return;
+                }
+
+                const data = await response.json();
+                allChats = data.chats || [];
+                
+                if (allChats.length === 0) {
+                    chatList.innerHTML = '<p style="color: #666; text-align: center;">No chats found. Make sure WhatsApp is connected.</p>';
+                    return;
+                }
+
+                renderChatList();
+            } catch (error) {
+                chatList.innerHTML = '<p style="color: #e74c3c; text-align: center;">Network error loading chats</p>';
+            }
+        }
+
+        function renderChatList() {
+            const chatList = document.getElementById('chatList');
+            const searchTerm = document.getElementById('chatSearch').value.toLowerCase();
+            
+            const filteredChats = allChats.filter(chat => 
+                chat.name.toLowerCase().includes(searchTerm)
+            );
+
+            if (filteredChats.length === 0) {
+                chatList.innerHTML = '<p style="color: #666; text-align: center;">No chats match your search</p>';
+                return;
+            }
+
+            chatList.innerHTML = filteredChats.map(chat => \`
+                <div style="padding: 8px; border-bottom: 1px solid #e0e0e0;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" 
+                               value="\${chat.name}"
+                               \${selectedChatNames.includes(chat.name) ? 'checked' : ''}
+                               onchange="toggleChatName(this.value, this.checked)"
+                               style="margin-right: 10px;">
+                        <span>\${chat.name}</span>
+                        <span style="margin-left: auto; color: #666; font-size: 12px;">
+                            \${chat.isGroup ? '📱 Group' : '👤 Direct'}
+                        </span>
+                    </label>
+                </div>
+            \`).join('');
+        }
+
+        function filterChats() {
+            renderChatList();
+        }
+
+        function toggleChatName(chatName, checked) {
+            if (checked) {
+                if (!selectedChatNames.includes(chatName)) {
+                    selectedChatNames.push(chatName);
+                }
+            } else {
+                selectedChatNames = selectedChatNames.filter(name => name !== chatName);
+            }
+        }
+
+        function toggleChatSelection() {
+            const checkbox = document.getElementById('monitorAllGroupChats');
+            const container = document.getElementById('chatSelectionContainer');
+            if (checkbox.checked) {
+                container.style.opacity = '0.5';
+                container.style.pointerEvents = 'none';
+            } else {
+                container.style.opacity = '1';
+                container.style.pointerEvents = 'auto';
+            }
         }
 
         async function loadConfig() {
@@ -550,14 +713,18 @@ export class AdminServer {
                 // Display current configuration
                 const configDiv = document.getElementById('currentConfig');
                 configDiv.innerHTML = \`
-                    <p><strong>Allowed Chats:</strong> \${config.allowedChatNames.length > 0 ? config.allowedChatNames.join(', ') : 'All chats'}</p>
+                    <p><strong>Monitor All Group Chats:</strong> \${config.monitorAllGroupChats ? 'Yes' : 'No'}</p>
+                    <p><strong>Allowed Chats:</strong> \${config.monitorAllGroupChats ? 'All group chats' : (config.allowedChatNames.length > 0 ? config.allowedChatNames.join(', ') : 'All chats')}</p>
                     <p><strong>Target Group ID:</strong> \${config.targetGroupId || 'Not set'}</p>
                     <p><strong>Target Group Name:</strong> \${config.targetGroupName || 'Not set'}</p>
                     <p><strong>Last Updated:</strong> \${new Date(config.lastUpdated).toLocaleString()}</p>
                 \`;
 
                 // Populate form fields
-                document.getElementById('allowedChats').value = config.allowedChatNames.join('\\n');
+                document.getElementById('monitorAllGroupChats').checked = config.monitorAllGroupChats || false;
+                selectedChatNames = config.allowedChatNames || [];
+                renderChatList();
+                toggleChatSelection();
                 document.getElementById('targetGroupId').value = config.targetGroupId || '';
                 document.getElementById('targetGroupName').value = config.targetGroupName || '';
             } catch (error) {
@@ -568,12 +735,7 @@ export class AdminServer {
         async function updateConfig(event) {
             event.preventDefault();
 
-            const allowedChatsText = document.getElementById('allowedChats').value;
-            const allowedChatNames = allowedChatsText
-                .split('\\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0);
-
+            const monitorAllGroupChats = document.getElementById('monitorAllGroupChats').checked;
             const targetGroupId = document.getElementById('targetGroupId').value.trim();
             const targetGroupName = document.getElementById('targetGroupName').value.trim();
 
@@ -585,7 +747,8 @@ export class AdminServer {
                         'Authorization': 'Bearer ' + authToken
                     },
                     body: JSON.stringify({
-                        allowedChatNames,
+                        monitorAllGroupChats,
+                        allowedChatNames: selectedChatNames,
                         targetGroupId,
                         targetGroupName
                     })

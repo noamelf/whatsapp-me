@@ -71,7 +71,11 @@ async function main() {
           );
         },
         testEndpointToken,
-        configService
+        configService,
+        // Chat provider for admin interface
+        async () => {
+          return await whatsappClient.getAllChats();
+        }
       );
       healthServer.start(healthPort);
       
