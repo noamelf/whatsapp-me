@@ -8,7 +8,7 @@ The `/test-message` endpoint allows you to test event detection without sending 
 
 - **URL:** `POST /test-message`
 - **Content-Type:** `application/json`
-- **Port:** Same as health check server (default: 8080 in production, 3000 locally)
+- **Port:** Same as HTTP server (default: 8080 in production, 3000 locally)
 - **Authentication:** Required if `TEST_ENDPOINT_TOKEN` environment variable is set
 
 ## Authentication

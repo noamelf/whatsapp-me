@@ -1,5 +1,6 @@
 import { WhatsAppClient } from "./whatsapp-client";
-import { HealthServer } from "./health-server";
+import { HttpServer } from "./http-server";
+import { ConfigService } from "./config-service";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -25,8 +26,11 @@ async function main() {
       process.exit(1);
     }
 
-    // Initialize WhatsApp client
-    const whatsappClient = new WhatsAppClient();
+    // Initialize configuration service
+    const configService = new ConfigService();
+
+    // Initialize WhatsApp client with config service
+    const whatsappClient = new WhatsAppClient(configService);
 
     try {
       await whatsappClient.initialize();
@@ -48,10 +52,10 @@ async function main() {
       // Start listening for incoming messages
       whatsappClient.startListeningForMessages();
 
-      // Start health check server with test message handler
-      const healthPort = parseInt(process.env.PORT || "3000", 10);
+      // Start HTTP server with test message handler, admin interface, and health endpoint
+      const httpPort = parseInt(process.env.PORT || "3000", 10);
       const testEndpointToken = process.env.TEST_ENDPOINT_TOKEN;
-      const healthServer = new HealthServer(
+      const httpServer = new HttpServer(
         () => ({
           isConnected: whatsappClient.isConnected(),
           connectionState: whatsappClient.getConnectionState(),
@@ -66,9 +70,23 @@ async function main() {
             imageMimeType
           );
         },
-        testEndpointToken
+        testEndpointToken,
+        configService,
+        // Chat provider for admin interface
+        async () => {
+          return await whatsappClient.getAllChats();
+        },
+        // WhatsApp status provider for admin interface (QR code, connection state)
+        () => ({
+          isConnected: whatsappClient.isConnected(),
+          connectionState: whatsappClient.getConnectionState(),
+          qrCode: whatsappClient.getLatestQRCode(),
+        })
       );
-      healthServer.start(healthPort);
+      httpServer.start(httpPort);
+      
+      console.log(`\n🔐 Admin interface available at: http://localhost:${httpPort}/admin`);
+      console.log("Use this interface to manage monitored chats and output configuration.");
 
       // Keep the application running until user terminates it
       await new Promise(() => {}); // This promise never resolves, keeping the app running

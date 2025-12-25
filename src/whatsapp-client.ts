@@ -22,6 +22,7 @@ import * as qrcode from "qrcode-terminal";
 import * as QRCode from "qrcode";
 import NodeCache from "node-cache";
 import { LLMService, type EventDetails } from "./llm-service";
+import { ConfigService } from "./config-service";
 
 // Type for cached group data persisted to file
 interface PersistedCacheData {
@@ -71,6 +72,7 @@ export class WhatsAppClient {
   private readonly cacheFilePath: string;
   private readonly eventsFilePath: string;
   private llmService: LLMService;
+  private configService: ConfigService;
   private targetGroupName = "אני"; // Default target group name (can be overridden via TARGET_GROUP_NAME env var)
   private targetGroupId: string | null = null;
   private shouldReconnect = true;
@@ -83,12 +85,14 @@ export class WhatsAppClient {
   private readonly PHOTO_FLOOD_THRESHOLD = 3; // Number of photos to consider a flood
   private readonly PHOTO_FLOOD_WINDOW_MS = 30000; // 30 seconds window
   private readonly PHOTO_FLOOD_CAPTION_THRESHOLD = 0.7; // 70% without captions triggers flood detection
+  private latestQRCode: string | null = null; // Store latest QR code data URL
 
-  constructor() {
+  constructor(configService?: ConfigService) {
+    this.configService = configService || new ConfigService();
     this.groupCache = new NodeCache({ stdTTL: 30 * 60, useClones: false }); // 30 minute TTL
     this.cacheFilePath = path.join(this.sessionDir, "group_cache.json");
     this.eventsFilePath = path.join(this.sessionDir, "created_events.json");
-    this.llmService = new LLMService();
+    this.llmService = new LLMService(this.configService);
 
     // Configure target group from environment variables
     this.configureTargetGroup();
@@ -120,12 +124,17 @@ export class WhatsAppClient {
   }
 
   private configureTargetGroup(): void {
-    // Read target group configuration from environment variables
+    // First, try to get from ConfigService (which may have been updated via admin interface)
+    const configTargetGroupId = this.configService.getTargetGroupId();
+    const configTargetGroupName = this.configService.getTargetGroupName();
+
+    // Then check environment variables (for backward compatibility)
     const envTargetGroupId = process.env.TARGET_GROUP_ID?.trim();
     const envTargetGroupName = process.env.TARGET_GROUP_NAME?.trim();
 
+    // Prefer environment variables if set, otherwise use config service values
     if (envTargetGroupId) {
-      // If TARGET_GROUP_ID is provided, use it directly
+      // If TARGET_GROUP_ID is provided in env, use it directly
       this.targetGroupId = envTargetGroupId;
       // Also set the group name if provided, otherwise we'll fetch it later
       if (envTargetGroupName) {
@@ -134,14 +143,27 @@ export class WhatsAppClient {
       console.log(
         `Using target group ID from environment: ${this.targetGroupId}`
       );
+    } else if (configTargetGroupId) {
+      // Use config service value
+      this.targetGroupId = configTargetGroupId;
+      this.targetGroupName = configTargetGroupName;
+      console.log(
+        `Using target group ID from config: ${this.targetGroupId}`
+      );
     } else if (envTargetGroupName) {
-      // If only TARGET_GROUP_NAME is provided, use it for searching
+      // If only TARGET_GROUP_NAME is provided in env, use it for searching
       this.targetGroupName = envTargetGroupName;
       console.log(
         `Will search for target group by name: "${this.targetGroupName}"`
       );
+    } else if (configTargetGroupName) {
+      // Use config service target group name
+      this.targetGroupName = configTargetGroupName;
+      console.log(
+        `Will search for target group by name from config: "${this.targetGroupName}"`
+      );
     } else {
-      // Use default value if nothing is configured in .env
+      // Use default value if nothing is configured
       console.log(`Using default target group name: "${this.targetGroupName}"`);
     }
   }
@@ -483,6 +505,7 @@ export class WhatsAppClient {
           // This is secure because the QR data never leaves your machine
           try {
             const qrDataUrl = await QRCode.toDataURL(qr, { width: 300 });
+            this.latestQRCode = qrDataUrl; // Store for admin interface
             console.log(
               "\n📱 Can't see the QR code? Copy and paste this URL into your browser:"
             );
@@ -492,6 +515,7 @@ export class WhatsAppClient {
             console.log(
               "\n📱 Can't see the QR code? Try adjusting your terminal size."
             );
+            this.latestQRCode = null;
           }
         }
 
@@ -536,6 +560,7 @@ export class WhatsAppClient {
           this.isReady = true;
           this.hasEverConnected = true;
           this.reconnectAttempts = 0;
+          this.latestQRCode = null; // Clear QR code once connected
           console.log("WhatsApp connection opened successfully!");
 
           // Find the target group when connection is established
@@ -1125,8 +1150,48 @@ export class WhatsAppClient {
     return this.connectionState;
   }
 
+  public getLatestQRCode(): string | null {
+    return this.latestQRCode;
+  }
+
   public getTargetGroupName(): string {
     return this.targetGroupName;
+  }
+
+  /**
+   * Get all available chats (groups and direct chats)
+   * Returns an array of chat objects with id, name, and isGroup flag
+   */
+  public async getAllChats(): Promise<{ id: string; name: string; isGroup: boolean }[]> {
+    if (!this.socket || !this.isReady) {
+      throw new Error("WhatsApp client not connected");
+    }
+
+    try {
+      const chats: { id: string; name: string; isGroup: boolean }[] = [];
+
+      // Fetch all groups
+      const groups = await this.socket.groupFetchAllParticipating();
+      for (const [groupId, groupMetadata] of Object.entries(groups)) {
+        chats.push({
+          id: groupId,
+          name: groupMetadata.subject || groupId,
+          isGroup: true,
+        });
+      }
+
+      // Note: Baileys doesn't have a direct method to list all individual chats
+      // We would need to iterate through message history or use store
+      // For now, we'll just return groups, which is the main use case
+
+      // Sort by name
+      chats.sort((a, b) => a.name.localeCompare(b.name));
+
+      return chats;
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+      throw error;
+    }
   }
 
   /**

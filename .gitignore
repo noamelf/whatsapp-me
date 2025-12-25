@@ -131,6 +131,7 @@ dist
 
 # Baileys authentication directory
 .baileys_auth/
+.baileys_auth_test/
 
 # macOS
 .DS_Store

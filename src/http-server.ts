@@ -1,4 +1,6 @@
 import * as http from "http";
+import { AdminServer } from "./admin-server";
+import { ConfigService } from "./config-service";
 
 interface HealthStatus {
   status: "healthy" | "unhealthy" | "initializing";
@@ -35,28 +37,52 @@ type MessageHandler = (
   formattedMessages?: string[];
 }>;
 
-export class HealthServer {
+export class HttpServer {
   private server: http.Server | null = null;
   private startTime: Date;
   private statusProvider: StatusProvider;
   private messageHandler?: MessageHandler;
   private testEndpointToken?: string;
+  private adminServer: AdminServer;
 
   constructor(
     statusProvider: StatusProvider,
     messageHandler?: MessageHandler,
-    testEndpointToken?: string
+    testEndpointToken?: string,
+    configService?: ConfigService,
+    chatProvider?: () => Promise<{ id: string; name: string; isGroup: boolean }[]>,
+    whatsappStatusProvider?: () => { isConnected: boolean; connectionState: string; qrCode: string | null }
   ) {
     this.startTime = new Date();
     this.statusProvider = statusProvider;
     this.messageHandler = messageHandler;
     this.testEndpointToken = testEndpointToken;
+    this.adminServer = new AdminServer(
+      configService || new ConfigService(),
+      chatProvider,
+      whatsappStatusProvider
+    );
   }
 
   public start(port = 3000): void {
     this.server = http.createServer((req, res) => {
-      // Handle GET /health or GET /
-      if (req.method === "GET" && (req.url === "/health" || req.url === "/")) {
+      const url = req.url || "";
+
+      // Handle admin routes
+      if (url.startsWith("/admin")) {
+        this.adminServer.handleRequest(req, res);
+        return;
+      }
+
+      // Handle GET / - redirect to admin interface
+      if (req.method === "GET" && url === "/") {
+        res.writeHead(302, { "Location": "/admin" });
+        res.end();
+        return;
+      }
+
+      // Handle GET /health
+      if (req.method === "GET" && url === "/health") {
         const status = this.getHealthStatus();
         // Return 200 during setup (before first connection), 503 if disconnected after setup
         const statusCode = status.status === "unhealthy" ? 503 : 200;
@@ -64,7 +90,7 @@ export class HealthServer {
         res.end(JSON.stringify(status, null, 2));
       }
       // Handle POST /test-message
-      else if (req.method === "POST" && req.url === "/test-message") {
+      else if (req.method === "POST" && url === "/test-message") {
         void this.handleTestMessage(req, res);
       } else {
         res.writeHead(404, { "Content-Type": "application/json" });
@@ -73,12 +99,12 @@ export class HealthServer {
     });
 
     this.server.listen(port, "0.0.0.0", () => {
-      console.log(`Health check server running on port ${port}`);
-      console.log(`Endpoints: GET / or GET /health, POST /test-message`);
+      console.log(`HTTP server running on port ${port}`);
+      console.log(`Endpoints: GET / (redirects to /admin), GET /health, POST /test-message, GET /admin`);
     });
 
     this.server.on("error", (error) => {
-      console.error("Health server error:", error);
+      console.error("HTTP server error:", error);
     });
   }
 
