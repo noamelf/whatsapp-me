@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/node";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
 import { WhatsAppClient } from "./whatsapp-client";
 import { HttpServer } from "./http-server";
 import { ConfigService } from "./config-service";
@@ -5,6 +7,28 @@ import dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config();
+
+// Initialize Sentry if DSN is provided
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    integrations: [
+      nodeProfilingIntegration(),
+    ],
+    // Send structured logs to Sentry
+    enableLogs: true,
+    // Tracing
+    tracesSampleRate: 1.0, // Capture 100% of the transactions
+    // Set sampling rate for profiling - this is evaluated only once per SDK.init call
+    profileSessionSampleRate: 1.0,
+    // Trace lifecycle automatically enables profiling during active traces
+    profileLifecycle: 'trace',
+    // Setting this option to true will send default PII data to Sentry.
+    // For example, automatic IP address collection on events
+    sendDefaultPii: true,
+  });
+  console.log("Sentry initialized for error tracking and performance monitoring");
+}
 
 async function main() {
   try {
@@ -33,12 +57,18 @@ async function main() {
     const whatsappClient = new WhatsAppClient(configService);
 
     try {
-      await whatsappClient.initialize();
-      console.log("WhatsApp client initialized successfully!");
+      // Profile the WhatsApp initialization process
+      await Sentry.startSpan({
+        name: "WhatsApp Client Initialization",
+        op: "whatsapp.init"
+      }, async () => {
+        await whatsappClient.initialize();
+        console.log("WhatsApp client initialized successfully!");
 
-      // Add a delay after initialization to ensure WhatsApp is fully loaded
-      console.log("Waiting for WhatsApp to fully load before proceeding...");
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+        // Add a delay after initialization to ensure WhatsApp is fully loaded
+        console.log("Waiting for WhatsApp to fully load before proceeding...");
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      });
 
       console.log("\nWhatsApp connection established successfully.");
       console.log("Your session has been saved for future use.");
@@ -93,10 +123,12 @@ async function main() {
     } catch (error) {
       console.error("Failed to initialize WhatsApp client:", error);
       console.log("Please check your internet connection and try again.");
+      Sentry.captureException(error);
       process.exit(1);
     }
   } catch (error) {
     console.error("An unexpected error occurred:", error);
+    Sentry.captureException(error);
     process.exit(1);
   }
 }
@@ -122,12 +154,14 @@ process.on("SIGINT", () => {
 // Handle uncaught exceptions
 process.on("uncaughtException", (error) => {
   console.error("Uncaught exception:", error);
+  Sentry.captureException(error);
   process.exit(1);
 });
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, _promise) => {
   console.error("Unhandled promise rejection:", reason);
+  Sentry.captureException(reason);
   process.exit(1);
 });
 
