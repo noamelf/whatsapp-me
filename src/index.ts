@@ -57,18 +57,30 @@ async function main() {
     const whatsappClient = new WhatsAppClient(configService);
 
     try {
-      // Profile the WhatsApp initialization process
-      await Sentry.startSpan({
-        name: "WhatsApp Client Initialization",
-        op: "whatsapp.init"
-      }, async () => {
+      // Profile the WhatsApp initialization process (if Sentry is enabled)
+      if (process.env.SENTRY_DSN) {
+        await Sentry.startSpan(
+          {
+            name: "WhatsApp Client Initialization",
+            op: "whatsapp.init",
+          },
+          async () => {
+            await whatsappClient.initialize();
+            console.log("WhatsApp client initialized successfully!");
+
+            // Add a delay after initialization to ensure WhatsApp is fully loaded
+            console.log("Waiting for WhatsApp to fully load before proceeding...");
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+        );
+      } else {
         await whatsappClient.initialize();
         console.log("WhatsApp client initialized successfully!");
 
         // Add a delay after initialization to ensure WhatsApp is fully loaded
         console.log("Waiting for WhatsApp to fully load before proceeding...");
         await new Promise((resolve) => setTimeout(resolve, 5000));
-      });
+      }
 
       console.log("\nWhatsApp connection established successfully.");
       console.log("Your session has been saved for future use.");
@@ -123,12 +135,16 @@ async function main() {
     } catch (error) {
       console.error("Failed to initialize WhatsApp client:", error);
       console.log("Please check your internet connection and try again.");
-      Sentry.captureException(error);
+      if (process.env.SENTRY_DSN) {
+        Sentry.captureException(error);
+      }
       process.exit(1);
     }
   } catch (error) {
     console.error("An unexpected error occurred:", error);
-    Sentry.captureException(error);
+    if (process.env.SENTRY_DSN) {
+      Sentry.captureException(error);
+    }
     process.exit(1);
   }
 }
@@ -154,14 +170,20 @@ process.on("SIGINT", () => {
 // Handle uncaught exceptions
 process.on("uncaughtException", (error) => {
   console.error("Uncaught exception:", error);
-  Sentry.captureException(error);
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(error);
+  }
   process.exit(1);
 });
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, _promise) => {
   console.error("Unhandled promise rejection:", reason);
-  Sentry.captureException(reason);
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(
+      reason instanceof Error ? reason : new Error(String(reason))
+    );
+  }
   process.exit(1);
 });
 

@@ -54,5 +54,3 @@ describe("Sentry Integration Configuration", () => {
     expect(testConfig.sendDefaultPii).toBe(true);
   });
 });
-
-
