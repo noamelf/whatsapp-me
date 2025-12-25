@@ -1,5 +1,5 @@
 import { WhatsAppClient } from "./whatsapp-client";
-import { HealthServer } from "./health-server";
+import { HttpServer } from "./http-server";
 import { ConfigService } from "./config-service";
 import dotenv from "dotenv";
 
@@ -52,10 +52,10 @@ async function main() {
       // Start listening for incoming messages
       whatsappClient.startListeningForMessages();
 
-      // Start health check server with test message handler
-      const healthPort = parseInt(process.env.PORT || "3000", 10);
+      // Start HTTP server with test message handler, admin interface, and health endpoint
+      const httpPort = parseInt(process.env.PORT || "3000", 10);
       const testEndpointToken = process.env.TEST_ENDPOINT_TOKEN;
-      const healthServer = new HealthServer(
+      const httpServer = new HttpServer(
         () => ({
           isConnected: whatsappClient.isConnected(),
           connectionState: whatsappClient.getConnectionState(),
@@ -83,9 +83,9 @@ async function main() {
           qrCode: whatsappClient.getLatestQRCode(),
         })
       );
-      healthServer.start(healthPort);
+      httpServer.start(httpPort);
       
-      console.log(`\n🔐 Admin interface available at: http://localhost:${healthPort}/admin`);
+      console.log(`\n🔐 Admin interface available at: http://localhost:${httpPort}/admin`);
       console.log("Use this interface to manage monitored chats and output configuration.");
 
       // Keep the application running until user terminates it

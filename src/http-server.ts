@@ -37,7 +37,7 @@ type MessageHandler = (
   formattedMessages?: string[];
 }>;
 
-export class HealthServer {
+export class HttpServer {
   private server: http.Server | null = null;
   private startTime: Date;
   private statusProvider: StatusProvider;
@@ -99,12 +99,12 @@ export class HealthServer {
     });
 
     this.server.listen(port, "0.0.0.0", () => {
-      console.log(`Health check server running on port ${port}`);
-      console.log(`Endpoints: GET / or GET /health, POST /test-message, GET /admin`);
+      console.log(`HTTP server running on port ${port}`);
+      console.log(`Endpoints: GET / (redirects to /admin), GET /health, POST /test-message, GET /admin`);
     });
 
     this.server.on("error", (error) => {
-      console.error("Health server error:", error);
+      console.error("HTTP server error:", error);
     });
   }
 
