@@ -509,11 +509,12 @@ export class AdminServer {
                         <!-- Target Group Configuration -->
                         <div class="form-group">
                             <label for="targetGroup">Target Group for Event Summaries</label>
-                            <select id="targetGroup" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                            <input type="search" id="targetGroupSearch" placeholder="Search groups..." oninput="filterTargetGroups()" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; margin-bottom: 8px;">
+                            <select id="targetGroup" size="6" style="width: 100%; padding: 8px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; height: auto;">
                                 <option value="">Loading groups...</option>
                             </select>
                             <p class="help-text">
-                                Select the WhatsApp group where event summaries will be sent.
+                                Select the WhatsApp group where event summaries will be sent. Use search to filter.
                             </p>
                         </div>
 
@@ -632,19 +633,36 @@ export class AdminServer {
             }
         }
 
+        let filteredTargetGroups = [];
+
         function populateTargetGroupDropdown() {
             const targetGroupSelect = document.getElementById('targetGroup');
             
             // Only show groups in target dropdown (not direct chats)
             const groups = allChats.filter(chat => chat.isGroup);
+            filteredTargetGroups = groups;
             
             if (groups.length === 0) {
                 targetGroupSelect.innerHTML = '<option value="">No groups available</option>';
                 return;
             }
 
-            targetGroupSelect.innerHTML = '<option value="">Select a group...</option>' + 
-                groups.map(group => \`<option value="\${group.id}">\${group.name}</option>\`).join('');
+            renderTargetGroups(groups);
+        }
+
+        function renderTargetGroups(groups) {
+            const targetGroupSelect = document.getElementById('targetGroup');
+            targetGroupSelect.innerHTML = groups.map(group => 
+                \`<option value="\${group.id}">\${group.name}</option>\`
+            ).join('');
+        }
+
+        function filterTargetGroups() {
+            const searchTerm = document.getElementById('targetGroupSearch').value.toLowerCase();
+            const groups = allChats.filter(chat => 
+                chat.isGroup && chat.name.toLowerCase().includes(searchTerm)
+            );
+            renderTargetGroups(groups);
         }
 
         function renderChatList() {
