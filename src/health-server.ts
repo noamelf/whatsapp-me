@@ -74,8 +74,15 @@ export class HealthServer {
         return;
       }
 
-      // Handle GET /health or GET /
-      if (req.method === "GET" && (url === "/health" || url === "/")) {
+      // Handle GET / - redirect to admin interface
+      if (req.method === "GET" && url === "/") {
+        res.writeHead(302, { "Location": "/admin" });
+        res.end();
+        return;
+      }
+
+      // Handle GET /health
+      if (req.method === "GET" && url === "/health") {
         const status = this.getHealthStatus();
         // Return 200 during setup (before first connection), 503 if disconnected after setup
         const statusCode = status.status === "unhealthy" ? 503 : 200;
