@@ -387,10 +387,10 @@ export class AdminServer {
         .content {
             padding: 30px;
         }
-        .login-form, .admin-panel {
+        .login-form, .admin-panel, .setup-screen {
             display: none;
         }
-        .login-form.active, .admin-panel.active {
+        .login-form.active, .admin-panel.active, .setup-screen.active {
             display: block;
         }
         .form-group {
@@ -496,6 +496,36 @@ export class AdminServer {
             margin-bottom: 15px;
             color: #333;
         }
+        .qr-container {
+            text-align: center;
+            padding: 30px;
+        }
+        .qr-code {
+            max-width: 300px;
+            margin: 20px auto;
+            border: 3px solid #667eea;
+            border-radius: 12px;
+            padding: 15px;
+            background: white;
+        }
+        .setup-message {
+            font-size: 18px;
+            color: #333;
+            margin: 20px 0;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -517,6 +547,25 @@ export class AdminServer {
                     </div>
                     <button type="submit" class="btn">Login</button>
                 </form>
+            </div>
+
+            <!-- Setup Screen (QR Code) -->
+            <div class="setup-screen" id="setupScreen">
+                <h2 style="margin-bottom: 20px; text-align: center;">WhatsApp Setup</h2>
+                <div id="qrContainer" class="qr-container" style="display: none;">
+                    <p class="setup-message">📱 Scan this QR code with your WhatsApp mobile app</p>
+                    <img id="qrCodeImage" class="qr-code" alt="WhatsApp QR Code" />
+                    <p class="help-text">Open WhatsApp on your phone → Settings → Linked Devices → Link a Device</p>
+                </div>
+                <div id="connectingContainer" class="qr-container" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <p class="setup-message">⏳ Connecting to WhatsApp...</p>
+                    <p class="help-text">Please wait while we establish the connection</p>
+                </div>
+                <div id="setupComplete" class="qr-container" style="display: none;">
+                    <p class="setup-message" style="color: #28a745;">✅ WhatsApp connected successfully!</p>
+                    <p class="help-text">Loading configuration interface...</p>
+                </div>
             </div>
 
             <!-- Admin Panel -->
@@ -606,10 +655,11 @@ export class AdminServer {
 
     <script>
         let authToken = sessionStorage.getItem('adminToken');
+        let statusCheckInterval = null;
 
         // Check if already logged in
         if (authToken) {
-            showAdminPanel();
+            checkWhatsAppStatus();
         }
 
         async function login(event) {
@@ -629,7 +679,7 @@ export class AdminServer {
                 if (response.ok) {
                     authToken = data.token;
                     sessionStorage.setItem('adminToken', authToken);
-                    showAdminPanel();
+                    checkWhatsAppStatus();
                 } else {
                     errorDiv.textContent = data.error || 'Login failed';
                     errorDiv.style.display = 'block';
@@ -640,8 +690,115 @@ export class AdminServer {
             }
         }
 
-        function showAdminPanel() {
+        async function checkWhatsAppStatus() {
+            try {
+                const response = await fetch('/admin/status', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const status = await response.json();
+
+                if (status.isConnected) {
+                    // WhatsApp is connected, show admin panel
+                    showSetupComplete();
+                    setTimeout(() => {
+                        showAdminPanel();
+                    }, 1500);
+                } else if (status.qrCode) {
+                    // Show QR code
+                    showQRCode(status.qrCode);
+                    startStatusPolling();
+                } else {
+                    // Connecting state
+                    showConnecting();
+                    startStatusPolling();
+                }
+            } catch (error) {
+                console.error('Error checking WhatsApp status:', error);
+                // Fallback to showing admin panel if status check fails
+                showAdminPanel();
+            }
+        }
+
+        function showQRCode(qrDataUrl) {
             document.getElementById('loginForm').classList.remove('active');
+            document.getElementById('adminPanel').classList.remove('active');
+            document.getElementById('setupScreen').classList.add('active');
+            
+            document.getElementById('qrContainer').style.display = 'block';
+            document.getElementById('connectingContainer').style.display = 'none';
+            document.getElementById('setupComplete').style.display = 'none';
+            
+            document.getElementById('qrCodeImage').src = qrDataUrl;
+        }
+
+        function showConnecting() {
+            document.getElementById('loginForm').classList.remove('active');
+            document.getElementById('adminPanel').classList.remove('active');
+            document.getElementById('setupScreen').classList.add('active');
+            
+            document.getElementById('qrContainer').style.display = 'none';
+            document.getElementById('connectingContainer').style.display = 'block';
+            document.getElementById('setupComplete').style.display = 'none';
+        }
+
+        function showSetupComplete() {
+            document.getElementById('qrContainer').style.display = 'none';
+            document.getElementById('connectingContainer').style.display = 'none';
+            document.getElementById('setupComplete').style.display = 'block';
+            stopStatusPolling();
+        }
+
+        function startStatusPolling() {
+            if (statusCheckInterval) return; // Already polling
+            
+            statusCheckInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/admin/status', {
+                        headers: { 'Authorization': 'Bearer ' + authToken }
+                    });
+
+                    if (response.ok) {
+                        const status = await response.json();
+                        
+                        if (status.isConnected) {
+                            showSetupComplete();
+                            setTimeout(() => {
+                                showAdminPanel();
+                            }, 1500);
+                        } else if (status.qrCode) {
+                            document.getElementById('qrCodeImage').src = status.qrCode;
+                            if (document.getElementById('qrContainer').style.display === 'none') {
+                                showQRCode(status.qrCode);
+                            }
+                        } else {
+                            if (document.getElementById('connectingContainer').style.display === 'none') {
+                                showConnecting();
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error polling status:', error);
+                }
+            }, 2000); // Poll every 2 seconds
+        }
+
+        function stopStatusPolling() {
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
+        }
+
+        function showAdminPanel() {
+            stopStatusPolling();
+            document.getElementById('loginForm').classList.remove('active');
+            document.getElementById('setupScreen').classList.remove('active');
             document.getElementById('adminPanel').classList.add('active');
             loadConfig();
             loadChats();
@@ -898,6 +1055,8 @@ export class AdminServer {
         }
 
         async function logout() {
+            stopStatusPolling();
+            
             try {
                 await fetch('/admin/logout', {
                     method: 'POST',
@@ -910,6 +1069,7 @@ export class AdminServer {
             authToken = null;
             sessionStorage.removeItem('adminToken');
             document.getElementById('adminPanel').classList.remove('active');
+            document.getElementById('setupScreen').classList.remove('active');
             document.getElementById('loginForm').classList.add('active');
             document.getElementById('password').value = '';
         }
