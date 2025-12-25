@@ -187,8 +187,14 @@ export class LLMService {
         ? `\nGroup/Chat Name: "${chatName}" - Use this as context to better understand the nature and purpose of the conversation when analyzing for events.`
         : "";
 
+      // Get focused instructions from config
+      const focusedInstructions = this.configService.getFocusedInstructions();
+      const customInstructions = focusedInstructions
+        ? `\n\nADDITIONAL FOCUSED INSTRUCTIONS:\n${focusedInstructions}\n`
+        : "";
+
       const prompt = `
-Analyze the following WhatsApp message and determine if it contains information about one or more events (like meetings, parties, gatherings, etc.).${imageNote}${groupContext}
+Analyze the following WhatsApp message and determine if it contains information about one or more events (like meetings, parties, gatherings, etc.).${imageNote}${groupContext}${customInstructions}
 A message can contain MULTIPLE events - make sure to extract ALL of them.
 Events usually contain a day reference, like "יום ראשון" or "יום שני" or "יום שלישי" or "יום רביעי" or "יום חמישי" or "יום שישי" or "יום שבת" 
 It could also be a specific date. It doesn't have to include all information like location.

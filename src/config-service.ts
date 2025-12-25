@@ -10,6 +10,7 @@ export interface ConfigData {
   targetGroupId: string;
   targetGroupName: string;
   adminPassword: string; // Salted and hashed password for admin authentication (format: salt$hash)
+  focusedInstructions: string; // Custom instructions to guide the LLM for better event detection
   lastUpdated: string;
 }
 
@@ -71,6 +72,7 @@ export class ConfigService {
       targetGroupId: process.env.TARGET_GROUP_ID?.trim() || "",
       targetGroupName: process.env.TARGET_GROUP_NAME?.trim() || "אני",
       adminPassword: process.env.ADMIN_PASSWORD || "", // Empty means no auth initially
+      focusedInstructions: process.env.FOCUSED_INSTRUCTIONS || "", // Custom instructions for LLM
       lastUpdated: new Date().toISOString(),
     };
   }
@@ -196,5 +198,19 @@ export class ConfigService {
    */
   public setMonitorAllGroupChats(value: boolean): void {
     this.updateConfig({ monitorAllGroupChats: value });
+  }
+
+  /**
+   * Get focused instructions for LLM
+   */
+  public getFocusedInstructions(): string {
+    return this.getConfig().focusedInstructions || "";
+  }
+
+  /**
+   * Set focused instructions for LLM
+   */
+  public setFocusedInstructions(instructions: string): void {
+    this.updateConfig({ focusedInstructions: instructions });
   }
 }

@@ -647,6 +647,15 @@ export class AdminServer {
                             </p>
                         </div>
 
+                        <!-- Focused Instructions -->
+                        <div class="form-group">
+                            <label for="focusedInstructions">Focused Instructions for Event Detection</label>
+                            <textarea id="focusedInstructions" rows="4" placeholder="e.g., Focus on school events and parent meetings. Ignore social gatherings." style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; resize: vertical; font-family: inherit;"></textarea>
+                            <p class="help-text">
+                                Provide custom instructions to guide the AI for better event detection. These instructions will be included in every analysis. Leave empty to use default behavior.
+                            </p>
+                        </div>
+
                         <button type="submit" class="btn">Save Configuration</button>
                         <button type="button" class="btn btn-secondary" onclick="loadConfig()">Reload</button>
                     </form>
@@ -994,6 +1003,9 @@ export class AdminServer {
                 if (config.targetGroupId) {
                     targetGroupSelect.value = config.targetGroupId;
                 }
+                
+                // Set focused instructions
+                document.getElementById('focusedInstructions').value = config.focusedInstructions || '';
             } catch (error) {
                 showError('Failed to load configuration');
             }
@@ -1004,6 +1016,7 @@ export class AdminServer {
 
             const monitorAllGroupChats = document.getElementById('monitorAllGroupChats').checked;
             const targetGroupId = document.getElementById('targetGroup').value;
+            const focusedInstructions = document.getElementById('focusedInstructions').value.trim();
             
             // Find the group name from the selected ID
             const selectedGroup = allChats.find(chat => chat.id === targetGroupId);
@@ -1020,7 +1033,8 @@ export class AdminServer {
                         monitorAllGroupChats,
                         allowedChatNames: selectedChatNames,
                         targetGroupId,
-                        targetGroupName
+                        targetGroupName,
+                        focusedInstructions
                     })
                 });
 
