@@ -35,14 +35,20 @@ export class AdminServer {
   }
 
   /**
-   * Hash a password using SHA-256
+   * Hash a password using PBKDF2 with a random salt
+   * Returns format: salt$hash (both in hex)
    */
   private hashPassword(password: string): string {
-    return crypto.createHash("sha256").update(password).digest("hex");
+    const salt = crypto.randomBytes(16).toString("hex");
+    const hash = crypto
+      .pbkdf2Sync(password, salt, 100000, 64, "sha512")
+      .toString("hex");
+    return `${salt}$${hash}`;
   }
 
   /**
    * Verify if provided password matches stored hash
+   * Expected format: salt$hash
    */
   private verifyPassword(password: string): boolean {
     const storedHash = this.configService.getAdminPasswordHash();
@@ -52,7 +58,29 @@ export class AdminServer {
       this.configService.setAdminPassword(hash);
       return true;
     }
-    return this.hashPassword(password) === storedHash;
+
+    // Handle legacy SHA-256 hashes (migrate them)
+    if (!storedHash.includes("$")) {
+      // This is a legacy unsalted hash, migrate on successful verification
+      const legacyHash = crypto
+        .createHash("sha256")
+        .update(password)
+        .digest("hex");
+      if (legacyHash === storedHash) {
+        // Migrate to salted hash
+        const newHash = this.hashPassword(password);
+        this.configService.setAdminPassword(newHash);
+        return true;
+      }
+      return false;
+    }
+
+    // Verify salted hash
+    const [salt, hash] = storedHash.split("$");
+    const verifyHash = crypto
+      .pbkdf2Sync(password, salt, 100000, 64, "sha512")
+      .toString("hex");
+    return hash === verifyHash;
   }
 
   /**

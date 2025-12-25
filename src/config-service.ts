@@ -9,7 +9,7 @@ export interface ConfigData {
   monitorAllGroupChats: boolean; // If true, monitor all group chats (overrides allowedChatNames)
   targetGroupId: string;
   targetGroupName: string;
-  adminPassword: string; // Hashed password for admin authentication
+  adminPassword: string; // Salted and hashed password for admin authentication (format: salt$hash)
   lastUpdated: string;
 }
 
