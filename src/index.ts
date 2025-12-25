@@ -75,7 +75,13 @@ async function main() {
         // Chat provider for admin interface
         async () => {
           return await whatsappClient.getAllChats();
-        }
+        },
+        // WhatsApp status provider for admin interface (QR code, connection state)
+        () => ({
+          isConnected: whatsappClient.isConnected(),
+          connectionState: whatsappClient.getConnectionState(),
+          qrCode: whatsappClient.getLatestQRCode(),
+        })
       );
       healthServer.start(healthPort);
       

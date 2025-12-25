@@ -85,6 +85,7 @@ export class WhatsAppClient {
   private readonly PHOTO_FLOOD_THRESHOLD = 3; // Number of photos to consider a flood
   private readonly PHOTO_FLOOD_WINDOW_MS = 30000; // 30 seconds window
   private readonly PHOTO_FLOOD_CAPTION_THRESHOLD = 0.7; // 70% without captions triggers flood detection
+  private latestQRCode: string | null = null; // Store latest QR code data URL
 
   constructor(configService?: ConfigService) {
     this.configService = configService || new ConfigService();
@@ -504,6 +505,7 @@ export class WhatsAppClient {
           // This is secure because the QR data never leaves your machine
           try {
             const qrDataUrl = await QRCode.toDataURL(qr, { width: 300 });
+            this.latestQRCode = qrDataUrl; // Store for admin interface
             console.log(
               "\n📱 Can't see the QR code? Copy and paste this URL into your browser:"
             );
@@ -513,6 +515,7 @@ export class WhatsAppClient {
             console.log(
               "\n📱 Can't see the QR code? Try adjusting your terminal size."
             );
+            this.latestQRCode = null;
           }
         }
 
@@ -557,6 +560,7 @@ export class WhatsAppClient {
           this.isReady = true;
           this.hasEverConnected = true;
           this.reconnectAttempts = 0;
+          this.latestQRCode = null; // Clear QR code once connected
           console.log("WhatsApp connection opened successfully!");
 
           // Find the target group when connection is established
@@ -1144,6 +1148,10 @@ export class WhatsAppClient {
 
   public getConnectionState(): string {
     return this.connectionState;
+  }
+
+  public getLatestQRCode(): string | null {
+    return this.latestQRCode;
   }
 
   public getTargetGroupName(): string {

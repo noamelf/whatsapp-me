@@ -5,6 +5,13 @@ import { ConfigService } from "./config-service";
 // Type for chat provider function
 type ChatProvider = () => Promise<{ id: string; name: string; isGroup: boolean }[]>;
 
+// Type for status provider function
+type StatusProvider = () => {
+  isConnected: boolean;
+  connectionState: string;
+  qrCode: string | null;
+};
+
 /**
  * Simple admin server for managing WhatsApp bot configuration
  * Provides a web interface and API endpoints for configuration management
@@ -15,10 +22,16 @@ export class AdminServer {
   private readonly sessionTimeout = 30 * 60 * 1000; // 30 minutes
   private sessionExpiry = 0;
   private chatProvider?: ChatProvider;
+  private statusProvider?: StatusProvider;
 
-  constructor(configService: ConfigService, chatProvider?: ChatProvider) {
+  constructor(
+    configService: ConfigService,
+    chatProvider?: ChatProvider,
+    statusProvider?: StatusProvider
+  ) {
     this.configService = configService;
     this.chatProvider = chatProvider;
+    this.statusProvider = statusProvider;
   }
 
   /**
@@ -101,6 +114,12 @@ export class AdminServer {
     if (!this.verifySession(token)) {
       res.writeHead(401, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Unauthorized - Please login" }));
+      return;
+    }
+
+    // Get WhatsApp connection status and QR code
+    if (req.method === "GET" && url === "/admin/status") {
+      this.handleGetStatus(res);
       return;
     }
 
@@ -196,6 +215,39 @@ export class AdminServer {
 
   /**
    * Handle get chats request - fetch available chats from WhatsApp
+   */
+  /**
+   * Handle get status request - returns WhatsApp connection status and QR code
+   */
+  private handleGetStatus(res: http.ServerResponse): void {
+    try {
+      if (!this.statusProvider) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: "Status provider not available",
+          })
+        );
+        return;
+      }
+
+      const status = this.statusProvider();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(status));
+    } catch (error) {
+      console.error("Error fetching status:", error);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: "Failed to fetch status",
+          details: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle get chats request
    */
   private async handleGetChats(res: http.ServerResponse): Promise<void> {
     try {

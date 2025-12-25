@@ -50,7 +50,8 @@ export class HealthServer {
     messageHandler?: MessageHandler,
     testEndpointToken?: string,
     configService?: ConfigService,
-    chatProvider?: () => Promise<{ id: string; name: string; isGroup: boolean }[]>
+    chatProvider?: () => Promise<{ id: string; name: string; isGroup: boolean }[]>,
+    whatsappStatusProvider?: () => { isConnected: boolean; connectionState: string; qrCode: string | null }
   ) {
     this.startTime = new Date();
     this.statusProvider = statusProvider;
@@ -58,7 +59,8 @@ export class HealthServer {
     this.testEndpointToken = testEndpointToken;
     this.adminServer = new AdminServer(
       configService || new ConfigService(),
-      chatProvider
+      chatProvider,
+      whatsappStatusProvider
     );
   }
 
